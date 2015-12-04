@@ -5,9 +5,14 @@
  */
 package com.nuevatel.mc.smpp.gw.client;
 
+import com.nuevatel.common.util.IntegerUtil;
+import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.common.util.Parameters;
+import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.common.util.UniqueID;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.PropName;
+import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.DeliverSmDialog;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
@@ -23,6 +28,8 @@ import com.nuevatel.mc.smpp.gw.exception.FailedBindOperationException;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -81,6 +88,8 @@ public class SmppClientManager {
 
     private static final long REQUEST_TIMEOUT_MS = 500;
     
+    private static long defaultValidityPeriod;
+    
     /**
      * All incoming events from the SMSC (SMPP server)
      */
@@ -111,6 +120,10 @@ public class SmppClientManager {
     private AddressRange addressRange = new AddressRange();
     
     private DialogService dialogService = AllocatorService.getDialogService();;
+    
+    static {
+        defaultValidityPeriod = LongUtil.tryParse(AllocatorService.getProperties().getProperty(PropName.defaultValidityPeriod.property()), 86400000L);
+    }
     
     public SmppClientManager(SmppGwSession gwSession,
                              BlockingQueue<SmppEvent>smppEvents, 
@@ -510,9 +523,15 @@ public class SmppClientManager {
                             DeliverSM deliverSM = (DeliverSM) pdu;
                             // TODO ask how to handle it
                             DeliverSmDialog deliverSmDialog = new DeliverSmDialog(uniqueID.nextLong());
-                            // TODO
-//                            dialogService.putDialog(deliverSmDialog, deliverSM.getValidityPeriod());
-                            
+                            ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
+                            ZonedDateTime zonedValidityPeriod = null;
+                            if (!StringUtils.isEmptyOrNull(deliverSM.getValidityPeriod())
+                                && now.isBefore(zonedValidityPeriod = SmppDateUtil.parseDateTime(now, deliverSM.getValidityPeriod()))) {
+                                dialogService.putDialog(deliverSmDialog, zonedValidityPeriod.toInstant().toEpochMilli() - now.toInstant().toEpochMilli());
+                            } else {
+                                dialogService.putDialog(deliverSmDialog, defaultValidityPeriod);
+                            }
+                            deliverSmDialog.init();
                         } else {
                             // no action missing dialog id
                             logger.warn("Missing DialogId for smpp sequence number:{}", pdu.getSequenceNumber());

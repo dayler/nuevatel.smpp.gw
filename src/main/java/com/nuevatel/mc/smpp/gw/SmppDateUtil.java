@@ -7,15 +7,22 @@ import java.time.Duration;
 import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.mc.smpp.gw.exception.InvalidSmppDateFormatException;
 
 /**
+ * 
+ * YYMMDDhhmmsstnnp
+ * YYMMddHHmmss
+ * 
  * @author Ariel Salazar
  *
  */
 public final class SmppDateUtil {
+    
+    private static DateTimeFormatter format = DateTimeFormatter.ofPattern("YYMMddHHmmss");
     
     private SmppDateUtil() {
         // No op. Prevent instantiation
@@ -26,7 +33,7 @@ public final class SmppDateUtil {
      * @return String representation for the SmppDatetime. <b>It is always in absolute format.</b>
      */
     public static String toSmppDatetime(ZonedDateTime time) {
-        return null;
+        return format.format(time) + "000+";
     }
     
     public static ZonedDateTime parseDateTime(ZonedDateTime now, String strDateTime) {
@@ -52,6 +59,7 @@ public final class SmppDateUtil {
                                            .plusSeconds(Integer.parseInt(strDateTime.substring(10, 12)));
             return now.plus(gapPeriod).plus(gapDuration);
         }
+        
         return ZonedDateTime.of(2000 + Integer.parseInt(strDateTime.substring(0, 2)),
                                 Integer.parseInt(strDateTime.substring(2, 4)),
                                 Integer.parseInt(strDateTime.substring(4, 6)), 

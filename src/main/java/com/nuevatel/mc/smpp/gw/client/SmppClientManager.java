@@ -510,8 +510,8 @@ public class SmppClientManager {
                             DeliverSM deliverSM = (DeliverSM) pdu;
                             // TODO ask how to handle it
                             DeliverSmDialog deliverSmDialog = new DeliverSmDialog(uniqueID.nextLong());
-                            
-                            dialogService.putDialog(deliverSmDialog, deliverSM.getValidityPeriod());
+                            // TODO
+//                            dialogService.putDialog(deliverSmDialog, deliverSM.getValidityPeriod());
                             
                         } else {
                             // no action missing dialog id

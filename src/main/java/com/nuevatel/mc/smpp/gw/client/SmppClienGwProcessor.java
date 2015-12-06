@@ -69,7 +69,7 @@ public class SmppClienGwProcessor extends SmppProcessor {
             // enquire link thread
             if (enquireLinkPeriod > 0) {
                 enquireLinkService = Executors.newSingleThreadScheduledExecutor();
-                enquireLinkService.scheduleWithFixedDelay(()->doEnquireLink(), enquireLinkPeriod, enquireLinkPeriod, TimeUnit.MILLISECONDS);
+                enquireLinkService.scheduleWithFixedDelay(()->doEnquireLink(), enquireLinkPeriod, enquireLinkPeriod, TimeUnit.SECONDS);
                 logger.info("enquireLink - period:{}", enquireLinkPeriod);
             }
             logger.info("SmppClientGwProcessor[smppGwId{}] was started...", gwSession.getSmppGwId());

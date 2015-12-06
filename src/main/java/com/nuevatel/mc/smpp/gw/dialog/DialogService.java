@@ -8,6 +8,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.nuevatel.common.cache.CacheBuilder;
 import com.nuevatel.common.cache.CacheLoader;
@@ -70,7 +71,10 @@ public class DialogService {
     private void resolveLoadingCache() {
         int size = IntegerUtil.tryParse(properties.getProperty(PropName.dialogcacheConcurrencyLevel.property()), 4);
         long expireAfterWriteTime = LongUtil.tryParse(properties.getProperty(PropName.expireAfterWriteTime.property()), 3600000L);
-        dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime).setSize(size).buildSimpleLoadingCache(new DialogLoader());;
+        dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime)
+                                                    .setSize(size)
+                                                    .setTimeUnit(TimeUnit.SECONDS)
+                                                    .buildSimpleLoadingCache(new DialogLoader());;
     }
     
     /**

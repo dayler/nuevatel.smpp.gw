@@ -11,7 +11,6 @@ import com.nuevatel.common.Processor;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.mc.smpp.gw.dialog.SmppEvent;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
-import com.nuevatel.mc.smpp.gw.event.McEvent;
 import com.nuevatel.mc.smpp.gw.event.McIncomingEvent;
 
 /**

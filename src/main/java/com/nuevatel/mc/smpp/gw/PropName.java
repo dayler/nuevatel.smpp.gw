@@ -12,7 +12,6 @@ public enum PropName {
     expireAfterWriteTime("smppgw.cache.expireAfterWriteTime"),
     dialogcacheTaskConcurrencyLevel("smppgw.dialogcache.task.concurrencyLevel"),
     enquireLinkPeriod("smppgw.enquireLinkPeriod"),
-    // TODO 
     defaultValidityPeriod("smppgw.defaultValidityPeriod"),
     ;
     

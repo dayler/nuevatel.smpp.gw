@@ -9,7 +9,9 @@ import java.util.Properties;
 
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
 import com.nuevatel.mc.smpp.gw.exception.NullDialogService;
+import com.nuevatel.mc.smpp.gw.exception.NullMcDispatcher;
 import com.nuevatel.mc.smpp.gw.exception.NullProperties;
+import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
 
 /**
  * Share all common services between app.
@@ -22,6 +24,8 @@ public final class AllocatorService {
     private static Properties properties = null;
     
     private static DialogService dialogService = null;
+    
+    private static McDispatcher mcDispatcher = new McDispatcher();
     
     /**
      * Contains all processors registered in the app. Each processor is an instance by mc session. The sessions are defined on table <code>mc.mc_smpp_gw</code>.
@@ -70,7 +74,22 @@ public final class AllocatorService {
      * @param smppGwId The smpp gw id (defined on table <code>mc.mc_smpp_gw</code>)
      * @return The processor to corresponds with <code>smppGwId</code>. <code>null</code> if there are not processor to corresponds with <code>smppGwId</code>.
      */
-    public static SmppGwProcessor getSmppProcessor(int smppGwId) {
+    public static SmppGwProcessor getSmppGwProcessor(int smppGwId) {
         return processorMap.get(smppGwId);
+    }
+    
+    public static void startMcDispatcher(int size) {
+        AllocatorService.mcDispatcher.execute(size);
+    }
+    
+    public static McDispatcher getMcDispatcher() {
+        return mcDispatcher;
+    }
+    
+    public static void shutdownMcDispatcher() {
+        if (mcDispatcher == null) {
+            throw new NullMcDispatcher();
+        }
+        mcDispatcher.shutdown();
     }
 }

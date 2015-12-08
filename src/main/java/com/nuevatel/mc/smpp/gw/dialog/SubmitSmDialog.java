@@ -5,15 +5,17 @@ package com.nuevatel.mc.smpp.gw.dialog;
 
 import org.smpp.ServerPDUEvent;
 
+import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
+
 /**
  * @author Ariel Salazar
  *
  */
 public class SubmitSmDialog extends Dialog {
-
-    public SubmitSmDialog(long messageId) {
-        super(messageId);
-        // TODO Auto-generated constructor stub
+    
+    public SubmitSmDialog(long messageId, int processorId) {
+        super(messageId, processorId);
     }
 
     /**
@@ -21,7 +23,8 @@ public class SubmitSmDialog extends Dialog {
      */
     @Override
     public void init() {
-        // TODO Auto-generated method stub
+        // Create SubmitSm
+        
     }
 
     /**
@@ -38,6 +41,12 @@ public class SubmitSmDialog extends Dialog {
     @Override
     public DialogType getType() {
         return DialogType.submitSm;
+    }
+
+    @Override
+    public void execute() {
+        // TODO Auto-generated method stub
+        
     }
 
 }

@@ -45,7 +45,7 @@ public class ForwardSmOTask implements Task {
                 // submit_sm
                 SubmitSmppEvent event = SubmitSmppEvent.fromForwardSmOCall(fwsmoCall);
                 // offer mc event
-                AllocatorService.getSmppProcessor(conn.getLocalId()).offerSmppEvent(event);
+                AllocatorService.getSmppGwProcessor(conn.getLocalId()).offerSmppEvent(event);
             } else if (SmppGwSession.SMPP_TYPE.ESME.equals(gwSession.getSmppType())) {
                 // TODO deliver_sm
             } else {

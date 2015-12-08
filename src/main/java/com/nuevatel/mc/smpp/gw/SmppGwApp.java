@@ -9,6 +9,7 @@ import com.nuevatel.mc.common.GenericApp;
 import com.nuevatel.mc.smpp.gw.appconn.ForwardSmOTask;
 import com.nuevatel.mc.smpp.gw.client.SmppClienGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
+import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
 import com.nuevatel.mc.smpp.gw.server.SmppServerGwProcessor;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +58,8 @@ public class SmppGwApp extends GenericApp {
         try {
             setProperties();
             super.start();
+            // Initialize McDispatcher
+            AllocatorService.startMcDispatcher(smppGwSessionMap.size());
             // Initialize processors
             ShutdownHook hook = new ShutdownHook(60, 1); // 60 timeout 1 thread
             service = Executors.newFixedThreadPool(smppGwSessionMap.size());
@@ -94,7 +97,7 @@ public class SmppGwApp extends GenericApp {
         // Shutdown processors
         AllocatorService.shutdownSmppGwProcessors(); // await 60 seconds to finish all
         smppGwSessionMap.forEach((smppGwSessionId, smppGwSession) -> smppGwSession.setBound(0));
-        
+        AllocatorService.shutdownMcDispatcher();
         logger.warn("state " + getState().getName());
     }
 

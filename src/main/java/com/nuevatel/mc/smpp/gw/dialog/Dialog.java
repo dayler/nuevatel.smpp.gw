@@ -6,6 +6,7 @@ package com.nuevatel.mc.smpp.gw.dialog;
 import org.smpp.ServerPDUEvent;
 
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
 
 /**
  * Life cycle -> init() handleEvent() ... execute()
@@ -17,23 +18,31 @@ public abstract class Dialog {
     
     protected long dialogId;
     
+    protected int processorId;
+    
     protected String smppMessageId = null;
     
     protected DialogService dialogService = AllocatorService.getDialogService();
     
+    protected McDispatcher mcDispatcher = AllocatorService.getMcDispatcher();
+    
     private int currentSequenceNumber = -1;
     
-    public Dialog(long dialogId) {
+    /**
+     * 
+     * @param dialogId Dialog id to identify the dialog. It must to the messageId used in the MC local.
+     * @param processorId Id to identify the processor at which belongs the dialog.
+     */
+    public Dialog(long dialogId, int processorId) {
         this.dialogId = dialogId;
+        this.processorId = processorId;
     }
     
     public abstract void init();
     
     public abstract void handleSmppEvent(ServerPDUEvent ev); 
     
-    public void execute() {
-        // No op
-    }
+    public abstract void execute();
     
     public long getDialogId() {
         return dialogId;

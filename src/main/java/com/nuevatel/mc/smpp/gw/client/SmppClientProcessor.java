@@ -17,6 +17,8 @@ import com.nuevatel.mc.smpp.gw.dialog.DialogService;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.CancelSmEvent;
 import com.nuevatel.mc.smpp.gw.event.DataSmEvent;
+import com.nuevatel.mc.smpp.gw.event.DefaultResponseEvent;
+import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.smpp.gw.event.QuerySmEvent;
 import com.nuevatel.mc.smpp.gw.event.ReplaceSmEvent;
 import com.nuevatel.mc.smpp.gw.event.SmppEvent;
@@ -214,7 +216,7 @@ public class SmppClientProcessor {
     }
     
     /**
-     * Receive smpp messages from remote SMSC, un till unbind. consume the PDU
+     * Receive smpp messages from remote SMSC and consume the PDU.
      */
     public void receive() {
         logger.info("client.recieve...");
@@ -243,7 +245,10 @@ public class SmppClientProcessor {
                                 // Create new dialog for deliver sm
                                 // TODO
                                 System.out.println("******* " + pdu.debugString() + " time " + ZonedDateTime.now().toString());
-                                Dialog deliverSmDialog = new DeliverSmDialog(Math.abs(uniqueID.nextLong()));
+                                // SmppSessionId is the processor identifier.
+                                Dialog deliverSmDialog = new DeliverSmDialog(Math.abs(uniqueID.nextLong()), // Assign new message id
+                                                                                      gwSession.getSmppSessionId(), // Id to identify the processor
+                                                                                      (DeliverSM) pdu); // Pdu
                                 // Register and init new dialog
                                 ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
                                 long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((DeliverSM)pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
@@ -291,7 +296,8 @@ public class SmppClientProcessor {
     }
 
     /**
-     * Dispatch messages to remote SMSC (smpp seerver) till unbind.
+     * Receive messages from local MC and dispatch it to remote SMSC
+     * 
      */
     public void dispatch() {
         try {
@@ -301,7 +307,7 @@ public class SmppClientProcessor {
                     // timeout
                     continue;
                 }
-                // dispatch to remote SMSC
+                // dispatch to MC
                 dispatchEvent(smppEvent);
                 logger.info("client.dispatch...");
             }
@@ -341,10 +347,41 @@ public class SmppClientProcessor {
         case ReplaceSmEvent:
             replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
             break;
+        case DefaultResponseEvent:
+            defaultResponse(castAs(DefaultResponseEvent.class, smppEvent));
+            break;
+        case GenericNAckEvent:
+            genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
+            break;
         default:
             logger.warn("Unknown McEvent...");
             break;
         }
+    }
+
+    /**
+     * Dispatch generic NACK event.
+     * 
+     * @param event
+     * @throws ValueNotSetException
+     * @throws WrongSessionStateException
+     * @throws IOException
+     */
+    private void genericNAckResponse(GenericNAckEvent event) throws ValueNotSetException, WrongSessionStateException, IOException {
+        Parameters.checkNull(event, "event");
+        smppSession.respond(event.getGenericNack());
+    }
+
+    /**
+     * 
+     * @param smResp Event to contains default response for smpp event.
+     * @throws IOException 
+     * @throws WrongSessionStateException 
+     * @throws ValueNotSetException 
+     */
+    private void defaultResponse(DefaultResponseEvent smResp) throws ValueNotSetException, WrongSessionStateException, IOException {
+        Parameters.checkNull(smResp, "smResp");
+        smppSession.respond(smResp.getDefaultResponse());
     }
 
     /**
@@ -387,6 +424,8 @@ public class SmppClientProcessor {
                                                        PDUException, // do submit, service type, short message, schedule delivery time, validity period
                                                        WrongSessionStateException, // do submit
                                                        IOException { // do submit, short message
+        Parameters.checkNull(smMsg, "smMsg");
+        
         SubmitSM request = new SubmitSM();
         // set input values.
         request.setServiceType(gwSession.getSystemType());

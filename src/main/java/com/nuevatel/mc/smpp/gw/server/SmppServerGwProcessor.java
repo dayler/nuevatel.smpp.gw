@@ -5,14 +5,14 @@
  */
 package com.nuevatel.mc.smpp.gw.server;
 
-import com.nuevatel.mc.smpp.gw.SmppProcessor;
+import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**
  *
  * @author asalazar
  */
-public class SmppServerGwProcessor extends SmppProcessor {
+public class SmppServerGwProcessor extends SmppGwProcessor {
 
     public SmppServerGwProcessor(SmppGwSession gwSession) {
         super(gwSession);

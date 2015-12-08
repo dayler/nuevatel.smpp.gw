@@ -33,12 +33,14 @@ public class SmppGw {
     public static final String WS_URL = "wsURL";
 
     /**
+     * to shutdown kill -15 pid
+     * 
      * The main method.
      * @param args String[]
      * 
      * String propVal = System.getProperty("log4j.configurationFile");
-        System.out.println("Log4j2: " + propVal);
-        logger.info("Log4j2: {}", propVal);
+     *  System.out.println("Log4j2: " + propVal);
+     *  logger.info("Log4j2: {}", propVal);
      * 
      */
     public static void main(String[] args) {
@@ -103,6 +105,8 @@ public class SmppGw {
 
                 // start
                 smppGwApp.start();
+                // Add shutdown hook
+                Runtime.getRuntime().addShutdownHook(new Thread(()->smppGwApp.interrupt()));
             } catch (Throwable e) {
                 logger.error(e.getMessage(), e);
                 System.exit(-1);

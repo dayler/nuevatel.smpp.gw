@@ -17,7 +17,7 @@ del for a message to send by local SMSC (MC)
  * @author Ariel Salazar
  *
  */
-public class SubmitSmMcIEvent extends McIncomingEvent {
+public class SubmitSmppEvent extends SmppEvent {
     
     private Address destAddr;
     
@@ -45,8 +45,8 @@ public class SubmitSmMcIEvent extends McIncomingEvent {
     
     private byte smDefaultMsgId = 0x0;
     
-    public SubmitSmMcIEvent(long messageId) {
-        super(messageId);
+    public SubmitSmppEvent(long messageId) {
+        setMessageId(messageId);
     }
     
     public Address getDestAddr() {
@@ -157,11 +157,11 @@ public class SubmitSmMcIEvent extends McIncomingEvent {
      * {@inheritDoc}
      */
     @Override
-    public McEventType type() {
-        return McEventType.SubmitSmMcEvent;
+    public SmppEventType type() {
+        return SmppEventType.SubmitSmEvent;
     }
     
-    public static SubmitSmMcIEvent fromForwardSmOCall(ForwardSmOCall fwsmoCall) {
+    public static SubmitSmppEvent fromForwardSmOCall(ForwardSmOCall fwsmoCall) {
         return null;
     }
 }

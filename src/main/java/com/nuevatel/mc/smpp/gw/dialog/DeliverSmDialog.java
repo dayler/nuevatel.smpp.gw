@@ -3,6 +3,8 @@
  */
 package com.nuevatel.mc.smpp.gw.dialog;
 
+import org.smpp.ServerPDUEvent;
+
 /**
  * @author Ariel Salazar
  *
@@ -25,7 +27,7 @@ public class DeliverSmDialog extends Dialog {
      * {@inheritDoc}
      */
     @Override
-    public void handleSmppEvent(SmppEvent ev) {
+    public void handleSmppEvent(ServerPDUEvent ev) {
         // TODO Auto-generated method stub
     }
 

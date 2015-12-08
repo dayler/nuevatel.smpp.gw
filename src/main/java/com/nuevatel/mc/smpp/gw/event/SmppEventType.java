@@ -9,11 +9,11 @@ package com.nuevatel.mc.smpp.gw.event;
  * @author asalazar
  *
  */
-public enum McEventType {
-    SubmitSmMcEvent, 
-    CancelSmMcEvent,
-    DataSmMcEvent,
-    ReplaceSmMcEvent,
-    QuerySmMcEvent,
+public enum SmppEventType {
+    SubmitSmEvent, 
+    CancelSmEvent,
+    DataSmEvent,
+    ReplaceSmEvent,
+    QuerySmEvent,
     ;
 }

@@ -3,6 +3,8 @@
  */
 package com.nuevatel.mc.smpp.gw.dialog;
 
+import org.smpp.ServerPDUEvent;
+
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 
 /**
@@ -15,6 +17,8 @@ public abstract class Dialog {
     
     protected long dialogId;
     
+    protected String smppMessageId = null;
+    
     protected DialogService dialogService = AllocatorService.getDialogService();
     
     private int currentSequenceNumber = -1;
@@ -25,7 +29,7 @@ public abstract class Dialog {
     
     public abstract void init();
     
-    public abstract void handleSmppEvent(SmppEvent ev); 
+    public abstract void handleSmppEvent(ServerPDUEvent ev); 
     
     public void execute() {
         // No op
@@ -33,6 +37,14 @@ public abstract class Dialog {
     
     public long getDialogId() {
         return dialogId;
+    }
+    
+    public void setSmppMessageId(String smppMessageId) {
+        this.smppMessageId = smppMessageId;
+    }
+    
+    public String getSmppMessageId() {
+        return smppMessageId;
     }
     
     public void setCurrentSequenceNumber(int currentSequenceNumber) {

@@ -6,6 +6,8 @@
 package com.nuevatel.mc.smpp.gw.client;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -20,7 +22,7 @@ import org.smpp.pdu.PDUException;
 import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.PropName;
-import com.nuevatel.mc.smpp.gw.SmppProcessor;
+import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**
@@ -30,11 +32,11 @@ import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
  *
  * @author Ariel Salazar
  */
-public class SmppClienGwProcessor extends SmppProcessor {
+public class SmppClienGwProcessor extends SmppGwProcessor {
     
-    private static Logger logger = LogManager.getLogger(SmppClientManager.class);
+    private static Logger logger = LogManager.getLogger(SmppClienGwProcessor.class);
     
-    private SmppClientManager clientMng;
+    private List<SmppClientProcessor>smppClientProcessorList = new ArrayList<>();
     
     private ExecutorService service;
     
@@ -49,8 +51,7 @@ public class SmppClienGwProcessor extends SmppProcessor {
      */
     public SmppClienGwProcessor(SmppGwSession gwSession) {
         super(gwSession);
-        clientMng = new SmppClientManager(gwSession, smppEvents, mcEvents);
-        service = Executors.newFixedThreadPool(2); // TODO
+        service = Executors.newFixedThreadPool(gwSession.getMaxBinds());
         // enquire link
         enquireLinkPeriod = LongUtil.tryParse(AllocatorService.getProperties().getProperty(PropName.enquireLinkPeriod.property()), 0L);
     }
@@ -61,16 +62,29 @@ public class SmppClienGwProcessor extends SmppProcessor {
     @Override
     public void execute() {
         try {
-            clientMng.bind();
-            // dispatch thread
-            service.execute(()->clientMng.dispatch());
-            // receive thread
-            service.execute(()->clientMng.receive());
-            // enquire link thread
-            if (enquireLinkPeriod > 0) {
-                enquireLinkService = Executors.newSingleThreadScheduledExecutor();
-                enquireLinkService.scheduleWithFixedDelay(()->doEnquireLink(), enquireLinkPeriod, enquireLinkPeriod, TimeUnit.SECONDS);
-                logger.info("enquireLink - period:{}", enquireLinkPeriod);
+            for (int i = 0; i < gwSession.getMaxBinds(); i++) {
+                try {
+                    // Create one processor for connection to handle
+                    SmppClientProcessor processor = new SmppClientProcessor(gwSession, serverPduEvents, smppEvents);
+                    smppClientProcessorList.add(processor);
+                    // do bind
+                    processor.bind();
+                    // dispatch thread
+                    service.execute(() -> processor.dispatch());
+                    // receive thread
+                    service.execute(() -> processor.receive());
+                    // enquire link thread
+                    if (enquireLinkPeriod > 0) {
+                        if (enquireLinkService == null) {
+                            enquireLinkService = Executors.newSingleThreadScheduledExecutor();
+                        }
+                        enquireLinkService.schedule(() -> doEnquireLink(processor), enquireLinkPeriod,
+                                TimeUnit.SECONDS);
+                    }
+                    logger.info("SmppClientProcessor was start [index={}]...", i);
+                } catch (Throwable ex) {
+                    logger.error("At index {} cannot be start SmppClientProcessor...", i, ex);
+                }
             }
             logger.info("SmppClientGwProcessor[smppGwId{}] was started...", gwSession.getSmppGwId());
         } catch (Throwable ex) {
@@ -80,9 +94,9 @@ public class SmppClienGwProcessor extends SmppProcessor {
         }
     }
     
-    private void doEnquireLink() {
+    private void doEnquireLink(SmppClientProcessor clientProcessor) {
         try {
-            clientMng.enquireLink();
+            clientProcessor.enquireLink();
             logger.debug("enquireLink...");
         } catch (TimeoutException | PDUException | WrongSessionStateException | IOException ex) {
             logger.error("Failed enquireLink...", ex);
@@ -95,9 +109,11 @@ public class SmppClienGwProcessor extends SmppProcessor {
     @Override
     public void shutdown(int ts) {
         try {
-            if (clientMng.isBound()) {
-                clientMng.unbind();
-            }
+            smppClientProcessorList.stream().forEach(processor -> {
+                if (processor.isBound()) {
+                    processor.unbind();
+                }
+            });
             // stop enquirelink service
             if (enquireLinkService != null) {
                 enquireLinkService.shutdown();

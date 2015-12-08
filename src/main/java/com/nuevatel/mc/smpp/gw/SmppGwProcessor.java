@@ -7,11 +7,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.smpp.ServerPDUEvent;
+
 import com.nuevatel.common.Processor;
 import com.nuevatel.common.util.Parameters;
-import com.nuevatel.mc.smpp.gw.dialog.SmppEvent;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
-import com.nuevatel.mc.smpp.gw.event.McIncomingEvent;
+import com.nuevatel.mc.smpp.gw.event.SmppEvent;
 
 /**
  * Abstract SmppProcessor.
@@ -19,7 +20,7 @@ import com.nuevatel.mc.smpp.gw.event.McIncomingEvent;
  * @author Ariel Salazar
  *
  */
-public abstract class SmppProcessor implements Processor {
+public abstract class SmppGwProcessor implements Processor {
     
     protected static final int TIME_OUT_SMPP_EVENT_QUEUE = 500;
     
@@ -28,24 +29,24 @@ public abstract class SmppProcessor implements Processor {
     /**
      * All incoming events from the SMSC (SMPP server)
      */
-    protected BlockingQueue<SmppEvent>smppEvents = new LinkedBlockingDeque<>();
+    protected BlockingQueue<ServerPDUEvent>serverPduEvents = new LinkedBlockingDeque<>();
     
     /**
      * All outgoing events. Messages to submit to remote SMSC (SMPP server)
      */
-    protected BlockingQueue<McIncomingEvent>mcEvents = new LinkedBlockingQueue<>();
+    protected BlockingQueue<SmppEvent>smppEvents = new LinkedBlockingQueue<>();
     
-    public SmppProcessor(SmppGwSession gwSession) {
+    public SmppGwProcessor(SmppGwSession gwSession) {
         Parameters.checkNull(gwSession, "gwSession");
         this.gwSession = gwSession;
     }
     
-    public void offerSmppEvent(SmppEvent event) {
-        smppEvents.add(event);
+    public void offerServerPduEvent(ServerPDUEvent event) {
+        serverPduEvents.add(event);
     }
     
-    public void offerMcIncomingEvent(McIncomingEvent event) {
-        mcEvents.add(event);
+    public void offerSmppEvent(SmppEvent event) {
+        smppEvents.add(event);
     }
     
     /**

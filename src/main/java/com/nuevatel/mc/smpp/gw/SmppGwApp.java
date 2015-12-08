@@ -1,6 +1,5 @@
 package com.nuevatel.mc.smpp.gw;
 
-import com.nuevatel.common.Processor;
 import com.nuevatel.common.ShutdownHook;
 import com.nuevatel.common.appconn.AppClient;
 import com.nuevatel.common.wsconn.*;
@@ -11,8 +10,7 @@ import com.nuevatel.mc.smpp.gw.appconn.ForwardSmOTask;
 import com.nuevatel.mc.smpp.gw.client.SmppClienGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.server.SmppServerGwProcessor;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -38,19 +36,13 @@ public class SmppGwApp extends GenericApp {
     private static final SmppGwApp smppGwApp = new SmppGwApp();
 
     /** The smppGwSessionMap. */
-    private Map<Integer, SmppGwSession>smppGwSessionMap = new LinkedHashMap<>();
-//    private List<SmppGwSession> smppGwSessionList = new ArrayList<>();
+    private Map<Integer, SmppGwSession>smppGwSessionMap = new HashMap<>();
     
     /**
      * Service to execute gw processors (client and server). It is initialized on start()
      */
     private ExecutorService service = null;
     
-    /**
-     * List of processors started. It is used to shutdown operation.
-     */
-    private Processor[] processors = null;
-
     /**
      * Creates a new instance of SmppGwApp.
      */
@@ -68,15 +60,14 @@ public class SmppGwApp extends GenericApp {
             // Initialize processors
             ShutdownHook hook = new ShutdownHook(60, 1); // 60 timeout 1 thread
             service = Executors.newFixedThreadPool(smppGwSessionMap.size());
-            processors = new Processor[smppGwSessionMap.size()];
             smppGwSessionMap.forEach((k, gwSession) -> {
-                SmppProcessor processor = makeGwProcessor(gwSession.getSmppType(), gwSession);
+                SmppGwProcessor processor = makeGwProcessor(gwSession.getSmppType(), gwSession);
                 // Initialize gw processors
                 service.execute(()->processor.execute());
                 hook.appendProcess(processor);
                 // register processors
-                AllocatorService.registerSmppProcessor(k, processor);
-            });            
+                AllocatorService.registerSmppGwProcessor(k, processor);
+            });
             // proxyAppMap
             remoteBaseAppMap.values().stream().filter((baseApp) -> baseApp.getState() == STATE.ONLINE)
                                               .map((baseApp) -> (ProxyApp) baseApp)
@@ -101,7 +92,7 @@ public class SmppGwApp extends GenericApp {
     public void interrupt() {
         super.interrupt();
         // Shutdown processors
-        Arrays.stream(processors).forEach((p)->p.shutdown(60)); // await 60 seconds to finish all
+        AllocatorService.shutdownSmppGwProcessors(); // await 60 seconds to finish all
         smppGwSessionMap.forEach((smppGwSessionId, smppGwSession) -> smppGwSession.setBound(0));
         
         logger.warn("state " + getState().getName());
@@ -202,23 +193,24 @@ public class SmppGwApp extends GenericApp {
             List<Ie> ies = wsClient.call(WS_METHOD.GET_SMPP_GW_PROPERTIES_LIST.getName(), TIMEOUT, new IntIe(WS_IE.APP_ID.getName(), getAppId()));
             if (ies != null && ies.size() > 0) {
                 ies.stream().map((ie) -> (CompositeIe) ie).forEach((smppGwProperties) -> {
-                            smppGwSessionMap.put(getAppId(), new SmppGwSession(getAppId(),
-                                                Integer.parseInt(smppGwProperties.getString(WS_IE.SMPP_SESSION_ID.getName())),
-                                                smppGwProperties.getString(WS_IE.SMPP_SESSION_NAME.getName()),
-                                                Integer.parseInt(smppGwProperties.getString(WS_IE.MC_ID.getName())),
-                                                SmppGwSession.MGMT_STATE.getMgmtState(smppGwProperties.getString(WS_IE.MGMT_STATE.getName())),
-                                                SmppGwSession.SMPP_TYPE.getSmppType(smppGwProperties.getString(WS_IE.SMPP_TYPE.getName())),
-                                                Boolean.parseBoolean(smppGwProperties.getString(WS_IE.REGISTERED_DELIVERY.getName())),
-                                                smppGwProperties.getString(WS_IE.SMSC_ADDRESS.getName()),
-                                                Integer.parseInt(smppGwProperties.getString(WS_IE.SMSC_PORT.getName())),
-                                                SmppGwSession.BIND_TYPE.getBindType(smppGwProperties.getString(WS_IE.BIND_TYPE.getName())),
-                                                smppGwProperties.getString(WS_IE.SYSTEM_ID.getName()),
-                                                smppGwProperties.getString(WS_IE.PASSWORD.getName()),
-                                                smppGwProperties.getString(WS_IE.SYSTEM_TYPE.getName()),
-                                                smppGwProperties.getString(WS_IE.R_SOURCE_ADDR_REGEX.getName()),
-                                                Integer.parseInt(smppGwProperties.getString(WS_IE.MAX_BINDS.getName())),
-                                                (smppGwProperties.getString(WS_IE.THROTTLE_LIMIT.getName()) != null) ? Integer.parseInt(smppGwProperties.getString(WS_IE.THROTTLE_LIMIT.getName())) : null,
-                                                Integer.parseInt(smppGwProperties.getString(WS_IE.BOUND.getName()))));
+                    SmppGwSession session = new SmppGwSession(getAppId(),
+                                                                Integer.parseInt(smppGwProperties.getString(WS_IE.SMPP_SESSION_ID.getName())),
+                                                                smppGwProperties.getString(WS_IE.SMPP_SESSION_NAME.getName()),
+                                                                Integer.parseInt(smppGwProperties.getString(WS_IE.MC_ID.getName())),
+                                                                SmppGwSession.MGMT_STATE.getMgmtState(smppGwProperties.getString(WS_IE.MGMT_STATE.getName())),
+                                                                SmppGwSession.SMPP_TYPE.getSmppType(smppGwProperties.getString(WS_IE.SMPP_TYPE.getName())),
+                                                                Boolean.parseBoolean(smppGwProperties.getString(WS_IE.REGISTERED_DELIVERY.getName())),
+                                                                smppGwProperties.getString(WS_IE.SMSC_ADDRESS.getName()),
+                                                                Integer.parseInt(smppGwProperties.getString(WS_IE.SMSC_PORT.getName())),
+                                                                SmppGwSession.BIND_TYPE.getBindType(smppGwProperties.getString(WS_IE.BIND_TYPE.getName())),
+                                                                smppGwProperties.getString(WS_IE.SYSTEM_ID.getName()),
+                                                                smppGwProperties.getString(WS_IE.PASSWORD.getName()),
+                                                                smppGwProperties.getString(WS_IE.SYSTEM_TYPE.getName()),
+                                                                smppGwProperties.getString(WS_IE.R_SOURCE_ADDR_REGEX.getName()),
+                                                                Integer.parseInt(smppGwProperties.getString(WS_IE.MAX_BINDS.getName())),
+                                                                (smppGwProperties.getString(WS_IE.THROTTLE_LIMIT.getName()) != null) ? Integer.parseInt(smppGwProperties.getString(WS_IE.THROTTLE_LIMIT.getName())) : null,
+                                                                Integer.parseInt(smppGwProperties.getString(WS_IE.BOUND.getName())));
+                            smppGwSessionMap.put(session.getSmppSessionId(), session);
                             });
             }
             else throw new RuntimeException("invalid ret for " + WS_METHOD.GET_SMPP_GW_PROPERTIES_LIST.getName());
@@ -252,7 +244,7 @@ public class SmppGwApp extends GenericApp {
      * @param gwSession
      * @return ServerGwProcessor for SMPP_TYPE.ESME SmppClientProcessor in other case.
      */
-    private SmppProcessor makeGwProcessor(SmppGwSession.SMPP_TYPE smppType, SmppGwSession gwSession) {
+    private SmppGwProcessor makeGwProcessor(SmppGwSession.SMPP_TYPE smppType, SmppGwSession gwSession) {
         if (SmppGwSession.SMPP_TYPE.SMSC.equals(smppType)) {
             // Server
             return new SmppServerGwProcessor(gwSession);

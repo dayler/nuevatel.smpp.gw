@@ -3,6 +3,7 @@
  */
 package com.nuevatel.mc.smpp.gw.dialog;
 
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import com.nuevatel.common.cache.CacheBuilder;
 import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
+import com.nuevatel.common.cache.RemovalListener;
 import com.nuevatel.common.util.IntegerUtil;
 import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
@@ -74,7 +76,7 @@ public class DialogService {
         dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime)
                                                     .setSize(size)
                                                     .setTimeUnit(TimeUnit.SECONDS)
-                                                    .buildSimpleLoadingCache(new DialogLoader());;
+                                                    .buildSimpleLoadingCache(new DialogLoader(), new OnRemoveDialogListener());
     }
     
     /**
@@ -90,11 +92,11 @@ public class DialogService {
      * Register a dialog in the cache.
      * 
      * @param dialog Dialog to register.
-     * @param expireAfterWriteTime Time in milliseconds after which it is invalidated. 
+     * @param expireAfterWriteTime Time in seconds after which it is invalidated. 
      */
     public void putDialog(Dialog dialog, long expireAfterWriteTime) {
         if (dialog != null) {
-            dialogCache.put(dialog.getDialogId(), dialog , expireAfterWriteTime, 0L/* disable after read */);
+            dialogCache.put(dialog.getDialogId(), dialog , expireAfterWriteTime, 0L/* disable after read */, TimeUnit.SECONDS);
         }
     }
     
@@ -110,14 +112,6 @@ public class DialogService {
     }
     
     /**
-     * 
-     * @return Time from now in which the 
-     */
-    public long calculateValidityPeriod() {
-        return 0L;
-    }
-    
-    /**
      * No action should not call never.
      */
     private static final class DialogLoader implements CacheLoader<Long, Dialog> {
@@ -125,6 +119,15 @@ public class DialogService {
         @Override
         public Dialog load(Long key) throws Exception {
             throw new NoDialogCachedObject();
+        }
+    }
+    
+    private static final class OnRemoveDialogListener implements RemovalListener<Long, Dialog> {
+
+        @Override
+        public void onRemoval(Long key, Dialog value) {
+            // TODO
+            System.out.println("++++++++++ Release " + value.dialogId + " time " + ZonedDateTime.now().toString());
         }
     }
 }

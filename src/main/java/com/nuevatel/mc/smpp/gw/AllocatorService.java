@@ -25,8 +25,10 @@ public final class AllocatorService {
     
     /**
      * Contains all processors registered in the app. Each processor is an instance by mc session. The sessions are defined on table <code>mc.mc_smpp_gw</code>.
+     * <br/>
+     * Map<smppGwId, Processor>
      */
-    private static Map<Integer, SmppProcessor>processorMap = new HashMap<>();
+    private static Map<Integer, SmppGwProcessor>processorMap = new HashMap<>();
     
     private AllocatorService() {
         // No op. Used to prevent instantiation
@@ -55,8 +57,12 @@ public final class AllocatorService {
         return dialogService;
     }
     
-    public static void registerSmppProcessor(int smppGwId, SmppProcessor processor) {
+    public static void registerSmppGwProcessor(int smppGwId, SmppGwProcessor processor) {
         processorMap.put(smppGwId, processor);
+    }
+    
+    public static void shutdownSmppGwProcessors() {
+        processorMap.forEach((k, p)->p.shutdown(60));
     }
     
     /**
@@ -64,7 +70,7 @@ public final class AllocatorService {
      * @param smppGwId The smpp gw id (defined on table <code>mc.mc_smpp_gw</code>)
      * @return The processor to corresponds with <code>smppGwId</code>. <code>null</code> if there are not processor to corresponds with <code>smppGwId</code>.
      */
-    public static SmppProcessor getSmppProcessor(int smppGwId) {
+    public static SmppGwProcessor getSmppProcessor(int smppGwId) {
         return processorMap.get(smppGwId);
     }
 }

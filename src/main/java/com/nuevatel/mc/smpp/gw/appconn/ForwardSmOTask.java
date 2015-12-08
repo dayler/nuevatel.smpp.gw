@@ -9,7 +9,7 @@ import com.nuevatel.mc.appconn.ForwardSmORet;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
-import com.nuevatel.mc.smpp.gw.event.SubmitSmMcIEvent;
+import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
 
 /**
  * <p>The ForwardSmOTask class.</p> Handles <code>ForwardSmOCall</code> appconn message.This kind of message is received when is delivered a short
@@ -43,9 +43,9 @@ public class ForwardSmOTask implements Task {
             
             if (SmppGwSession.SMPP_TYPE.ESME.equals(gwSession.getSmppType())) {
                 // submit_sm
-                SubmitSmMcIEvent event = SubmitSmMcIEvent.fromForwardSmOCall(fwsmoCall);
+                SubmitSmppEvent event = SubmitSmppEvent.fromForwardSmOCall(fwsmoCall);
                 // offer mc event
-                AllocatorService.getSmppProcessor(conn.getLocalId()).offerMcIncomingEvent(event);
+                AllocatorService.getSmppProcessor(conn.getLocalId()).offerSmppEvent(event);
             } else if (SmppGwSession.SMPP_TYPE.ESME.equals(gwSession.getSmppType())) {
                 // TODO deliver_sm
             } else {

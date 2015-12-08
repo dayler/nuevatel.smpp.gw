@@ -11,12 +11,12 @@ import org.smpp.pdu.Address;
  * @author Ariel Salazar
  *
  */
-public class QuerySmMcEvent extends McIncomingEvent {
+public class QuerySmEvent extends SmppEvent {
 
     private Address sourceAddr;
 
-    public QuerySmMcEvent(long messageId) {
-        super(messageId);
+    public QuerySmEvent(long messageId) {
+        setMessageId(messageId);
     }
     
     public Address getSourceAddr() {
@@ -31,8 +31,8 @@ public class QuerySmMcEvent extends McIncomingEvent {
      * {@inheritDoc}
      */
     @Override
-    public McEventType type() {
-        return McEventType.QuerySmMcEvent;
+    public SmppEventType type() {
+        return SmppEventType.QuerySmEvent;
     }
 
 }

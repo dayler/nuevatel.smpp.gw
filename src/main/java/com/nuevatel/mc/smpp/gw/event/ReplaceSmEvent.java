@@ -11,7 +11,7 @@ import org.smpp.pdu.Address;
  * @author asalazar
  *
  */
-public class ReplaceSmMcEvent extends McIncomingEvent {
+public class ReplaceSmEvent extends SmppEvent {
     
     private Address sourceAddr;
     
@@ -25,8 +25,8 @@ public class ReplaceSmMcEvent extends McIncomingEvent {
     
     private byte smDefaultMsgId = 0;
     
-    public ReplaceSmMcEvent(long messageId) {
-        super(messageId);
+    public ReplaceSmEvent(long messageId) {
+        setMessageId(messageId);
     }
     
     public Address getSourceAddr() {
@@ -81,8 +81,8 @@ public class ReplaceSmMcEvent extends McIncomingEvent {
      * {@inheritDoc}
      */
     @Override
-    public McEventType type() {
-        return McEventType.ReplaceSmMcEvent;
+    public SmppEventType type() {
+        return SmppEventType.ReplaceSmEvent;
     }
 
 }

@@ -11,7 +11,7 @@ import org.smpp.pdu.Address;
  * @author asalazar
  *
  */
-public class CancelSmMcEvent extends McIncomingEvent {
+public class CancelSmEvent extends SmppEvent {
 
     private String serviceType = "";
     
@@ -19,8 +19,8 @@ public class CancelSmMcEvent extends McIncomingEvent {
     
     private Address destAddr;
 
-    public CancelSmMcEvent(long messageId) {
-        super(messageId);
+    public CancelSmEvent(long messageId) {
+        setMessageId(messageId);
     }
 
     public String getServiceType() {
@@ -51,7 +51,7 @@ public class CancelSmMcEvent extends McIncomingEvent {
      * {@inheritDoc}
      */
     @Override
-    public McEventType type() {
-        return McEventType.CancelSmMcEvent;
+    public SmppEventType type() {
+        return SmppEventType.CancelSmEvent;
     }
 }

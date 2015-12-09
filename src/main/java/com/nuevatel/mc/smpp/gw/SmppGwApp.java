@@ -9,7 +9,6 @@ import com.nuevatel.mc.common.GenericApp;
 import com.nuevatel.mc.smpp.gw.appconn.ForwardSmOTask;
 import com.nuevatel.mc.smpp.gw.client.SmppClienGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
-import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
 import com.nuevatel.mc.smpp.gw.server.SmppServerGwProcessor;
 import java.util.HashMap;
 import java.util.List;

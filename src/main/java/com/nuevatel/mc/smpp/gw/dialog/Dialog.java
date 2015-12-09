@@ -16,6 +16,8 @@ import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
  */
 public abstract class Dialog {
     
+    private int currentSequenceNumber = -1;
+    
     protected long dialogId;
     
     protected int processorId;
@@ -26,7 +28,7 @@ public abstract class Dialog {
     
     protected McDispatcher mcDispatcher = AllocatorService.getMcDispatcher();
     
-    private int currentSequenceNumber = -1;
+    protected DialogState state = DialogState.created;
     
     /**
      * 
@@ -68,5 +70,9 @@ public abstract class Dialog {
 
     protected void invalidate() {
         dialogService.invalidate(this);
+    }
+    
+    public DialogState getState() {
+        return state;
     }
 }

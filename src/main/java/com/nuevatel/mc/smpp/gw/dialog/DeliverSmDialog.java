@@ -34,12 +34,14 @@ public class DeliverSmDialog extends Dialog {
     @Override
     public void init() {
         try {
+            state = DialogState.init;
             // do received ok response to remote smsc
             DefaultResponseEvent respEv = new DefaultResponseEvent(deliverPdu);
             gwProcessor.offerSmppEvent(respEv);
             // TODO send to local smsc
             // check if it is ready to invalidate
             if ((deliverPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) == Data.SM_SMSC_RECEIPT_NOT_REQUESTED) {
+                state = DialogState.close;
                 // Not request registered delivery
                 invalidate();
             }
@@ -71,5 +73,14 @@ public class DeliverSmDialog extends Dialog {
     public void execute() {
         // TODO Auto-generated method stub
         
+    }
+    
+    @Override
+    protected void invalidate() {
+        if (!DialogState.close.equals(state)) {
+            // No in close estate means an error occurred in the work flow.
+            gwProcessor.offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), Data.ESME_RSYSERR));
+        }
+        super.invalidate();
     }
 }

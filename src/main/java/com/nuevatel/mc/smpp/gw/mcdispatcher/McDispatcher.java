@@ -57,7 +57,6 @@ public class McDispatcher {
             return null;
         }
         Future<Message>future = service.submit(()->SmppGwApp.getSmppGwApp().getAppClient().dispatch(event.toMessage()));
-        
-        return ResponseMcEvent.fromMessage(future.get());
+        return McEventFactory.responseFromMessage(future.get());
     }
 }

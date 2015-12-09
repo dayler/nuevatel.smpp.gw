@@ -11,7 +11,7 @@ import com.nuevatel.common.appconn.Message;
  */
 public class McEventFactory {
 
-    public static ResponseMcEvent responsefromMessage(Message msg) {
+    public static ResponseMcEvent responseFromMessage(Message msg) {
         return null;
     }
 }

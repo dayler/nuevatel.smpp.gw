@@ -7,6 +7,7 @@ package com.nuevatel.mc.smpp.gw.client;
 
 import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.common.util.Parameters;
+import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.common.util.UniqueID;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.PropName;
@@ -17,7 +18,7 @@ import com.nuevatel.mc.smpp.gw.dialog.DialogService;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.CancelSmEvent;
 import com.nuevatel.mc.smpp.gw.event.DataSmEvent;
-import com.nuevatel.mc.smpp.gw.event.DefaultResponseEvent;
+import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.smpp.gw.event.QuerySmEvent;
 import com.nuevatel.mc.smpp.gw.event.ReplaceSmEvent;
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.net.SmtpManager;
 import org.smpp.Data;
 import org.smpp.ServerPDUEvent;
 import org.smpp.ServerPDUEventListener;
@@ -59,6 +61,9 @@ import org.smpp.pdu.Response;
 import org.smpp.pdu.SubmitSM;
 import org.smpp.pdu.UnbindResp;
 import org.smpp.pdu.ValueNotSetException;
+import org.smpp.util.ByteBuffer;
+import org.smpp.util.NotEnoughDataInByteBufferException;
+import org.smpp.util.TerminatingZeroNotFoundException;
 import org.smpp.pdu.Request;
 
 import static com.nuevatel.common.util.Util.*;
@@ -325,12 +330,16 @@ public class SmppClientProcessor {
      * @throws PDUException 
      * @throws TimeoutException 
      * @throws ValueNotSetException 
+     * @throws TerminatingZeroNotFoundException 
+     * @throws NotEnoughDataInByteBufferException 
      */
     private void dispatchEvent(SmppEvent smppEvent) throws ValueNotSetException,
-                                                       TimeoutException, 
-                                                       PDUException, 
-                                                       WrongSessionStateException, 
-                                                       IOException {
+                                                           TimeoutException, 
+                                                           PDUException, 
+                                                           WrongSessionStateException, 
+                                                           IOException,
+                                                           NotEnoughDataInByteBufferException,
+                                                           TerminatingZeroNotFoundException {
         switch (smppEvent.type()) {
         case SubmitSmEvent:
             submitSm(castAs(SubmitSmppEvent.class, smppEvent));
@@ -348,7 +357,7 @@ public class SmppClientProcessor {
             replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
             break;
         case DefaultResponseEvent:
-            defaultResponse(castAs(DefaultResponseEvent.class, smppEvent));
+            defaultResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
             break;
         case GenericNAckEvent:
             genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
@@ -379,7 +388,7 @@ public class SmppClientProcessor {
      * @throws WrongSessionStateException 
      * @throws ValueNotSetException 
      */
-    private void defaultResponse(DefaultResponseEvent smResp) throws ValueNotSetException, WrongSessionStateException, IOException {
+    private void defaultResponse(DefaultResponseOKEvent smResp) throws ValueNotSetException, WrongSessionStateException, IOException {
         Parameters.checkNull(smResp, "smResp");
         smppSession.respond(smResp.getDefaultResponse());
     }
@@ -418,28 +427,37 @@ public class SmppClientProcessor {
      * @throws PDUException 
      * @throws TimeoutException 
      * @throws ValueNotSetException 
+     * @throws TerminatingZeroNotFoundException 
+     * @throws NotEnoughDataInByteBufferException 
      */
-    private void submitSm(SubmitSmppEvent smMsg) throws ValueNotSetException, // do submit
+    private void submitSm(SubmitSmppEvent event) throws ValueNotSetException, // do submit
                                                        TimeoutException, // do submit
                                                        PDUException, // do submit, service type, short message, schedule delivery time, validity period
                                                        WrongSessionStateException, // do submit
-                                                       IOException { // do submit, short message
-        Parameters.checkNull(smMsg, "smMsg");
-        
+                                                       IOException,
+                                                       NotEnoughDataInByteBufferException,
+                                                       TerminatingZeroNotFoundException { // do submit, short message
+        Parameters.checkNull(event, "smMsg");
+
         SubmitSM request = new SubmitSM();
         // set input values.
         request.setServiceType(gwSession.getSystemType());
-        request.setSourceAddr(smMsg.getSourceAddr());
-        request.setDestAddr(smMsg.getDestAddr());
-        request.setReplaceIfPresentFlag(smMsg.getReplaceIfPresentFlag());
-        request.setShortMessage(smMsg.getShortMessage(), smMsg.getEncoding());
-        request.setScheduleDeliveryTime(smMsg.getScheduleDeliveryTime());
-        request.setValidityPeriod(smMsg.getValidityPeriod());
-        request.setEsmClass(smMsg.getEsmClass());
-        request.setProtocolId(smMsg.getProtocolId());
-        request.setPriorityFlag(smMsg.getPriorityFlag());
+        request.setSourceAddr(event.getSourceAddr());
+        request.setDestAddr(event.getDestAddr());
+        request.setReplaceIfPresentFlag(event.getReplaceIfPresentFlag());
+        // TODO how to avoid string conversion
+        if (StringUtils.isEmptyOrNull(event.getEncoding())) {
+            request.setShortMessageData(new ByteBuffer(event.getData()));
+        } else {
+            request.setShortMessage(new String(event.getData(), event.getEncoding()), event.getEncoding());
+        }
+        request.setScheduleDeliveryTime(event.getScheduleDeliveryTime());
+        request.setValidityPeriod(event.getValidityPeriod());
+        request.setEsmClass(event.getEsmClass());
+        request.setProtocolId(event.getProtocolId());
+        request.setPriorityFlag(event.getPriorityFlag());
         // Always assign sequence number
-        assignSequenceNumber(request, smMsg.getMessageId());
+        assignSequenceNumber(request, event.getMessageId());
         // Asynchronous submit request, response is catch in the listener
         smppSession.submit(request);
     }

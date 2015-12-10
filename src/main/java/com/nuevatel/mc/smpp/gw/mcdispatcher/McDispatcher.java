@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.exception.OperationRuntimeException;
+import com.nuevatel.mc.appconn.McMessage;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 
 /**
@@ -39,24 +40,24 @@ public class McDispatcher {
         }
     }
     
-    public void dispatch(RequestMcEvent event) {
-        if (event == null) {
+    public void dispatch(McMessage msg) {
+        if (msg == null) {
             return;
         }
         service.execute(() -> {
             try {
-                SmppGwApp.getSmppGwApp().getAppClient().dispatch(event.toMessage());
+                SmppGwApp.getSmppGwApp().getAppClient().dispatch(msg.toMessage());
             } catch (Exception ex) {
                 throw new OperationRuntimeException("Failed to dispatch message", ex);
             }
         });
     }
     
-    public ResponseMcEvent dispatchAndWait(RequestMcEvent event) throws InterruptedException, ExecutionException {
-        if (event == null) {
+    public Message dispatchAndWait(McMessage msg) throws InterruptedException, ExecutionException {
+        if (msg == null) {
             return null;
         }
-        Future<Message>future = service.submit(()->SmppGwApp.getSmppGwApp().getAppClient().dispatch(event.toMessage()));
-        return McEventFactory.responseFromMessage(future.get());
+        Future<Message>future = service.submit(()->SmppGwApp.getSmppGwApp().getAppClient().dispatch(msg.toMessage()));
+        return future.get();
     }
 }

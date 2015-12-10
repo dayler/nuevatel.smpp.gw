@@ -11,11 +11,11 @@ import org.smpp.pdu.Response;
  * @author Ariel Salazar
  *
  */
-public class DefaultResponseEvent extends SmppEvent {
+public class DefaultResponseOKEvent extends SmppEvent {
     
     private Response resp;
     
-    public DefaultResponseEvent(PDU pdu) {
+    public DefaultResponseOKEvent(PDU pdu) {
         // Get default resp
         this.resp = ((Request)pdu).getResponse();
     }

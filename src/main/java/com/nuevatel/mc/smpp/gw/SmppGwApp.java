@@ -29,7 +29,8 @@ import org.apache.logging.log4j.Logger;
  * @since 1.8
  */
 public class SmppGwApp extends GenericApp {
-    
+    /* constants */
+    private static final int CORE_POOL_SIZE = 2;
     private static Logger logger  = LogManager.getLogger(SmppGwApp.class);
 
     /** The smppGwApp. */

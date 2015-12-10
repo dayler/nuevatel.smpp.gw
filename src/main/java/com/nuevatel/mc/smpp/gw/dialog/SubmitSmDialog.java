@@ -5,8 +5,7 @@ package com.nuevatel.mc.smpp.gw.dialog;
 
 import org.smpp.ServerPDUEvent;
 
-import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
+import com.nuevatel.common.appconn.Message;
 
 /**
  * @author Ariel Salazar
@@ -33,6 +32,12 @@ public class SubmitSmDialog extends Dialog {
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
         // TODO Auto-generated method stub
+    }
+
+    @Override
+    public void handleMessage(Message msg) {
+        // TODO Auto-generated method stub
+        
     }
 
     /**

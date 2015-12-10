@@ -26,7 +26,7 @@ import org.apache.logging.log4j.Logger;
 public class SmppGw {
     
     private static Logger logger = LogManager.getLogger("com.nuevatel.mc");
-    
+
     /* constants for properties */
     public static final String APP_ID = "appId";
     public static final String MGMT_APP_PROPERTIES_LIST = "mgmtAppPropertiesList";

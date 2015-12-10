@@ -76,7 +76,7 @@ public class DialogService {
         dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime)
                                                     .setSize(size)
                                                     .setTimeUnit(TimeUnit.SECONDS)
-                                                    .buildSimpleLoadingCache(new DialogLoader(), new OnRemoveDialogListener());
+                                                    .buildSimpleLoadingCache(new DialogLoader(), new OnRemoveDialogListener(taskService));
     }
     
     /**
@@ -112,6 +112,15 @@ public class DialogService {
     }
     
     /**
+     * <code>true</code> if exists in the cache a dialog with <code>dialogId</code>.
+     * 
+     * @param dialogId Dialog to find
+     */
+    public boolean containsDialog(long dialogId) {
+        return dialogCache.contains(dialogId);
+    }
+    
+    /**
      * No action should not call never.
      */
     private static final class DialogLoader implements CacheLoader<Long, Dialog> {
@@ -123,11 +132,21 @@ public class DialogService {
     }
     
     private static final class OnRemoveDialogListener implements RemovalListener<Long, Dialog> {
-
+        
+        private ExecutorService taskService;
+        
+        public OnRemoveDialogListener(ExecutorService taskService) {
+            this.taskService = taskService;
+        }
+        
         @Override
-        public void onRemoval(Long key, Dialog value) {
-            // TODO
-            System.out.println("++++++++++ Release " + value.dialogId + " time " + ZonedDateTime.now().toString());
+        public void onRemoval(Long key, Dialog dialog) {
+            // TODO remove debug string
+            System.out.println("++++++++++ Release " + dialog.dialogId + " time " + ZonedDateTime.now().toString());
+            if (dialog != null) {
+                // execute task.
+                taskService.execute(()->dialog.execute());
+            }
         }
     }
 }

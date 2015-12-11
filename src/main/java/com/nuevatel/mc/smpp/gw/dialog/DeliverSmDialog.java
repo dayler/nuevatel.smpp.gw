@@ -3,6 +3,10 @@
  */
 package com.nuevatel.mc.smpp.gw.dialog;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.smpp.Data;
@@ -13,20 +17,37 @@ import com.nuevatel.common.appconn.AppMessages;
 import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
+import com.nuevatel.mc.appconn.ForwardSmICall;
+import com.nuevatel.mc.appconn.ForwardSmIRet;
 import com.nuevatel.mc.appconn.ForwardSmOCall;
 import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
+import com.nuevatel.mc.appconn.McMessage;
+import com.nuevatel.mc.appconn.Name;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.Constants;
+import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.tpdu.SmsDeliver;
 import com.nuevatel.mc.tpdu.SmsStatusReport;
+import com.nuevatel.mc.tpdu.TpAddress;
 import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.TpUd;
 import com.nuevatel.mc.tpdu.Tpdu;
 
 /**
+ * Handle incoming deliver message from remote smsc to local smpp client.
+ * <br/>
+ * (1) is enable rds.<br/>
+ * (2) Create SmsDeliver.<br/>
+ * (2) Send ForwardSmICall to Mc.<br/>
+ * (3) if rds is enabled await confirmation to deliver from MC. In other case finish trabsaction.<br/>
+ * (4) Confirmation has arrived, send ROK to remote SMSC.<br/>
+ * (5) Remote SMSC responds with acknowledgment for deliver confirmation.<br/>
+ * (6) Responds with ForwardSmORetAsync to confirm deliver.
+ * (7) Finish the transaction.<br/>
+ * 
  * @author Ariel Salazar
  *
  */
@@ -56,8 +77,7 @@ public class DeliverSmDialog extends Dialog {
             state = DialogState.init;
             // do received ok response to remote smsc
             registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED;
-            // TODO create fwsmicall and smsdeliver
-            // SmsDeliver
+            // create SmsDeliver
             byte encoding;
             switch (deliverPdu.getShortMessageEncoding()) {
             case Constants.CS_GSM7:
@@ -71,19 +91,68 @@ public class DeliverSmDialog extends Dialog {
                 break;
             }
             TpUd tpud = TpUd.newTpUd(encoding, deliverPdu.getShortMessage());
-            // SmsDeliver smsDeliver = new SmsDeliver(tpMms, tpRp, tpUdhi, tpSri, tpOa, tpPid, tpDcs, tpScts, tpUdl, tpUd);
-            
-            
-            
-            
-            
+            SmsDeliver smsDeliver = new SmsDeliver(// tpMms
+                                                   false,
+                                                   // tpRp
+                                                   (deliverPdu.getEsmClass() & Data.SM_REPLY_PATH_GSM) == Data.SM_REPLY_PATH_GSM,
+                                                   // tpUdhi
+                                                   (deliverPdu.getEsmClass() & Data.SM_UDH_GSM) == Data.SM_UDH_GSM,
+                                                   // tpSri
+                                                   registeredDelivery,
+                                                   //tpOa,
+                                                   new TpAddress(deliverPdu.getSourceAddr().getTon(), deliverPdu.getSourceAddr().getNpi(), deliverPdu.getSourceAddr().getAddress()),
+                                                   // tpPid
+                                                   deliverPdu.getProtocolId(),
+                                                   // tpDcs
+                                                   new TpDcs(encoding),
+                                                   // tpScts TP-Service-Centre-Time-Stamp
+                                                   LocalDateTime.now(ZoneId.of("UTC")),
+                                                   // tpUdl,
+                                                   tpud.getTpUdl(),
+                                                   // tpUd
+                                                   tpud.getTpUd());
+            // ForwardSmICall to notify the MC, new message has arrived
+            ForwardSmICall fwsmiCall = new ForwardSmICall(// smppServiceType,
+                                                          gwProcessor.getSmppGwSession().getSystemType(),
+                                                          // smppScheduleDeliveryTime,
+                                                          StringUtils.isEmptyOrNull(deliverPdu.getScheduleDeliveryTime()) ? null : SmppDateUtil.parseDateTime(ZonedDateTime.now(), deliverPdu.getScheduleDeliveryTime()),
+                                                          // smppReplaceIfPresentFlag
+                                                          deliverPdu.getReplaceIfPresentFlag(),
+                                                          // smppGwId
+                                                          gwProcessor.getSmppGwSession().getSmppGwId(),
+                                                          // smppSessionId
+                                                          gwProcessor.getSmppGwSession().getSmppSessionId(),
+                                                          // fromName
+                                                          new Name(deliverPdu.getSourceAddr().getAddress(), (byte)(deliverPdu.getSourceAddr().getTon() | deliverPdu.getSourceAddr().getNpi())),
+                                                          // tpdu
+                                                          smsDeliver.getTpdu());
+            // dispatch sync message
+            Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
+            if (ret == null) {
+                // failed
+                GenericNAckEvent gnack = new GenericNAckEvent(deliverPdu.getSequenceNumber(), Data.ESME_RSYSERR);
+                gwProcessor.offerSmppEvent(gnack);
+                invalidate();
+                errorCode = Data.ESME_RSYSERR;
+                return;
+            }
+            ForwardSmIRet fwsmiRet = new ForwardSmIRet(ret);
+            if (AppMessages.FAILED == fwsmiRet.getRet()) {
+                // failed
+                GenericNAckEvent gnack = new GenericNAckEvent(deliverPdu.getSequenceNumber(), Data.ESME_RSYSERR);
+                gwProcessor.offerSmppEvent(gnack);
+                errorCode = Data.ESME_RSYSERR;
+                invalidate();
+            }
             
             if (!registeredDelivery) {
+                // No await registered delivery
                 DefaultResponseOKEvent respEv = new DefaultResponseOKEvent(deliverPdu);
                 gwProcessor.offerSmppEvent(respEv);
                 state = DialogState.close;
                 invalidate();
             }
+            // For registered delivery enable await confirmation message from MC. No invalidate.
         } catch (Throwable ex) {
             logger.warn("Failed to initiate DeliverSmDialog. PDU:{}", deliverPdu == null ? null : deliverPdu.debugString());
             if (logger.isTraceEnabled()) {
@@ -108,6 +177,10 @@ public class DeliverSmDialog extends Dialog {
     public void handleMessage(Message msg) {
         Parameters.checkNull(msg, "msg");
         try {
+            if (McMessage.FORWARD_SM_O_CALL != msg.getCode()) {
+                // ignore message
+                return;
+            }
             ForwardSmOCall fwsmoCall = new ForwardSmOCall(msg);
             SmsStatusReport smsSr = new SmsStatusReport(fwsmoCall.getTpdu());
             switch (smsSr.getTpSt()) {
@@ -207,8 +280,9 @@ public class DeliverSmDialog extends Dialog {
 
     @Override
     public void execute() {
-        if (errorCode == Data.ESME_ROK) {
-            ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, 0);
+        if (DialogState.close.equals(state) && errorCode == Data.ESME_ROK) {
+            // Dispatch confirmation delivery
+            ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, (int) Tpdu.TP_ST_SM_RECEIVED_BY_SME);
             mcDispatcher.dispatch(call);
             return;
         }

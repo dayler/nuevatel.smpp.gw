@@ -49,6 +49,10 @@ public abstract class SmppGwProcessor implements Processor {
         smppEvents.add(event);
     }
     
+    public SmppGwSession getSmppGwSession() {
+        return gwSession;
+    }
+    
     /**
      * {@inheritDoc}
      */

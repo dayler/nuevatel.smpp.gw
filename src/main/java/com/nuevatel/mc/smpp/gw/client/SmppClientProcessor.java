@@ -8,8 +8,8 @@ package com.nuevatel.mc.smpp.gw.client;
 import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
-import com.nuevatel.common.util.UniqueID;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.McMessageId;
 import com.nuevatel.mc.smpp.gw.PropName;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.DeliverSmDialog;
@@ -28,6 +28,7 @@ import com.nuevatel.mc.smpp.gw.exception.FailedBindOperationException;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.concurrent.BlockingQueue;
@@ -123,7 +124,7 @@ public class SmppClientProcessor {
     
     private DialogService dialogService = AllocatorService.getDialogService();
     
-    private UniqueID uniqueID;
+    private McMessageId mcMsgId = new McMessageId();
     
     static {
         defaultValidityPeriod = LongUtil.tryParse(AllocatorService.getProperties().getProperty(PropName.defaultValidityPeriod.property()), 86400000L);
@@ -139,11 +140,6 @@ public class SmppClientProcessor {
         this.gwSession = gwSession;
         this.serverPduEvents = serverPduEvents;
         this.smppEvents = smppEvents;
-        try {
-            uniqueID = new UniqueID();
-        } catch (NoSuchAlgorithmException ex) {
-            logger.error("Failed to initialize UniqueId generator", ex);
-        }
     }
     
     /**
@@ -251,7 +247,7 @@ public class SmppClientProcessor {
                                 // TODO
                                 System.out.println("******* " + pdu.debugString() + " time " + ZonedDateTime.now().toString());
                                 // SmppSessionId is the processor identifier.
-                                Dialog deliverSmDialog = new DeliverSmDialog(Math.abs(uniqueID.nextLong()), // Assign new message id
+                                Dialog deliverSmDialog = new DeliverSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
                                                                                       gwSession.getSmppSessionId(), // Id to identify the processor
                                                                                       (DeliverSM) pdu); // Pdu
                                 // Register and init new dialog

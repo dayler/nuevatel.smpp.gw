@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.exception.OperationRuntimeException;
@@ -53,11 +54,11 @@ public class McDispatcher {
         });
     }
     
-    public Message dispatchAndWait(McMessage msg) throws InterruptedException, ExecutionException {
+    public Message dispatchAndWait(McMessage msg) throws InterruptedException, ExecutionException, TimeoutException {
         if (msg == null) {
             return null;
         }
         Future<Message>future = service.submit(()->SmppGwApp.getSmppGwApp().getAppClient().dispatch(msg.toMessage()));
-        return future.get();
+        return future.get(10, TimeUnit.SECONDS);
     }
 }

@@ -7,6 +7,7 @@ import org.smpp.Data;
 import org.smpp.pdu.Address;
 
 import com.nuevatel.mc.appconn.ForwardSmOCall;
+import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.tpdu.SmsDeliver;
 import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.TpUd;
@@ -180,10 +181,10 @@ public class SubmitSmppEvent extends SmppEvent {
         String encoding;
         switch (tpUd.getCharSet()) {
         case TpDcs.CS_GSM7:
-            encoding = "X-Gsm7Bit";
+            encoding = Constants.CS_GSM7;
             break;
         case TpDcs.CS_UCS2:
-            encoding = "UTF-16BE";
+            encoding = Constants.CS_UCS2;
             break;
         case TpDcs.CS_8_BIT:
             encoding = "";

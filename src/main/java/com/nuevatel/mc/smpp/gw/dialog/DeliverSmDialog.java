@@ -12,14 +12,17 @@ import org.smpp.pdu.DeliverSM;
 import com.nuevatel.common.appconn.AppMessages;
 import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.util.Parameters;
+import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.appconn.ForwardSmOCall;
 import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.tpdu.SmsDeliver;
 import com.nuevatel.mc.tpdu.SmsStatusReport;
+import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.TpUd;
 import com.nuevatel.mc.tpdu.Tpdu;
 
@@ -55,10 +58,20 @@ public class DeliverSmDialog extends Dialog {
             registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED;
             // TODO create fwsmicall and smsdeliver
             // SmsDeliver
-            
-            TpUd tpud = TpUd.newTpUd(arg0, arg1);
+            byte encoding;
+            switch (deliverPdu.getShortMessageEncoding()) {
+            case Constants.CS_GSM7:
+                encoding = TpDcs.CS_GSM7;
+                break;
+            case Constants.CS_UCS2:
+                encoding = TpDcs.CS_UCS2;
+                break;
+            default:
+                encoding = StringUtils.isEmptyOrNull(deliverPdu.getShortMessage()) ? TpDcs.CS_8_BIT : TpDcs.CS_GSM7;
+                break;
+            }
+            TpUd tpud = TpUd.newTpUd(encoding, deliverPdu.getShortMessage());
             // SmsDeliver smsDeliver = new SmsDeliver(tpMms, tpRp, tpUdhi, tpSri, tpOa, tpPid, tpDcs, tpScts, tpUdl, tpUd);
-//            SmsDeliver smsDeliver = new SmsDeliver(arg0);
             
             
             

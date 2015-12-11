@@ -34,7 +34,7 @@
     <common.version>1.5-SNAPSHOT</common.version>
     <junit.version>4.12</junit.version>
     <mockito.version>1.10.19</mockito.version>
-    <opensmpp.version>3.0.0</opensmpp.version>
+    <opensmpp.version>3.0.0-NUEVATEL</opensmpp.version>
     <log4j.version>2.4.1</log4j.version>
   </properties>
 

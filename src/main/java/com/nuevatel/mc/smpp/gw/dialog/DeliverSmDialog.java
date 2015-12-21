@@ -130,19 +130,16 @@ public class DeliverSmDialog extends Dialog {
             Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
             if (ret == null) {
                 // failed
-                GenericNAckEvent gnack = new GenericNAckEvent(deliverPdu.getSequenceNumber(), Data.ESME_RSYSERR);
-                gwProcessor.offerSmppEvent(gnack);
+                commandStatusCode = Data.ESME_RSYSERR;
                 invalidate();
-                errorCode = Data.ESME_RSYSERR;
                 return;
             }
             ForwardSmIRet fwsmiRet = new ForwardSmIRet(ret);
             if (AppMessages.FAILED == fwsmiRet.getRet()) {
                 // failed
-                GenericNAckEvent gnack = new GenericNAckEvent(deliverPdu.getSequenceNumber(), Data.ESME_RSYSERR);
-                gwProcessor.offerSmppEvent(gnack);
-                errorCode = Data.ESME_RSYSERR;
+                commandStatusCode = Data.ESME_RSYSERR;
                 invalidate();
+                return;
             }
             
             if (!registeredDelivery) {
@@ -151,15 +148,16 @@ public class DeliverSmDialog extends Dialog {
                 gwProcessor.offerSmppEvent(respEv);
                 state = DialogState.close;
                 invalidate();
+                return;
             }
             // For registered delivery enable await confirmation message from MC. No invalidate.
         } catch (Throwable ex) {
             logger.warn("Failed to initiate DeliverSmDialog. PDU:{}", deliverPdu == null ? null : deliverPdu.debugString());
-            if (logger.isTraceEnabled()) {
+            if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
                 logger.warn("Exception:", ex);
             }
             // dispatch no ok
-            errorCode = Data.ESME_RSYSERR;
+            commandStatusCode = Data.ESME_RSYSERR;
             // finalize dialog
             invalidate();
         }
@@ -174,7 +172,7 @@ public class DeliverSmDialog extends Dialog {
     }
 
     @Override
-    public void handleMessage(Message msg) {
+    public void handleMcMessage(Message msg) {
         Parameters.checkNull(msg, "msg");
         try {
             if (McMessage.FORWARD_SM_O_CALL != msg.getCode()) {
@@ -186,16 +184,17 @@ public class DeliverSmDialog extends Dialog {
             switch (smsSr.getTpSt()) {
             case Tpdu.TP_ST_SM_RECEIVED_BY_SME:
             case Tpdu.TP_ST_SM_REPLACED_BY_SC:
-                // deliver ROK sm response
+                // deliver ROK sm response, message delivered.
                 DefaultResponseOKEvent respEsmeRok = new DefaultResponseOKEvent(deliverPdu);
                 gwProcessor.offerSmppEvent(respEsmeRok);
+                commandStatusCode = Data.ESME_ROK;
                 state = DialogState.close;
                 invalidate();
                 return;
             case Tpdu.TP_ST_SM_FW_WO_CONFIRMATION:
                 // Forward but cannot receive confirmation
                 state = DialogState.failed;
-                errorCode = Data.ESME_RSYSERR;
+                commandStatusCode = Data.ESME_RSYSERR;
                 invalidate();
                 return;
             default:
@@ -223,7 +222,8 @@ public class DeliverSmDialog extends Dialog {
                 || temporaryError0 == Tpdu.TP_ST_ERROR_IN_SME
                 || temporaryError1 == Tpdu.TP_ST_ERROR_IN_SME) {
                 state = DialogState.failed;
-                errorCode = Data.ESME_RX_T_APPN;
+                // ESME receiver temporary App Error Code.
+                commandStatusCode = Data.ESME_RX_T_APPN;
                 invalidate();
                 return;
             }
@@ -243,22 +243,26 @@ public class DeliverSmDialog extends Dialog {
             case Tpdu.TP_ST_INCOMPATIBLE_DESTINATION:
             case Tpdu.TP_ST_NOT_OBTAINABLE:
             case Tpdu.TP_ST_NO_IW_AVAILABLE:
-                errorCode = Data.ESME_RX_P_APPN;
+                // ESME Receiver Permanent App Error Code.
+                commandStatusCode = Data.ESME_RX_P_APPN;
                 break;
             case Tpdu.TP_ST_CONNECTION_REJECTED_BY_SME:
-                errorCode = Data.ESME_RX_R_APPN;
+                // ESME Receiver Reject Message Error Code.
+                commandStatusCode = Data.ESME_RX_R_APPN;
                 break;
             case Tpdu.TP_ST_SM_VP_EXPIRED:
-                errorCode = Data.ESME_RINVEXPIRY;
+                // Invalid message validity period.
+                commandStatusCode = Data.ESME_RINVEXPIRY;
                 break;
             case Tpdu.TP_ST_SM_DELETED_BY_ORIG_SME:
             case Tpdu.TP_ST_SM_DELETED_BY_SC_ADM:
             case Tpdu.TP_ST_SM_DOES_NOT_EXIST:
-                errorCode = Data.ESME_RINVMSGID;
+                // Invalid message id.
+                commandStatusCode = Data.ESME_RINVMSGID;
                 break;
-
             default:
-                errorCode = Data.ESME_RX_P_APPN;
+                //// ESME Receiver Permanent App Error Code.
+                commandStatusCode = Data.ESME_RX_P_APPN;
                 break;
             }
             // set failed state
@@ -280,14 +284,15 @@ public class DeliverSmDialog extends Dialog {
 
     @Override
     public void execute() {
-        if (DialogState.close.equals(state) && errorCode == Data.ESME_ROK) {
+        // serviceMessage = smpp commandStatus
+        if (DialogState.close.equals(state) && commandStatusCode == Data.ESME_ROK) {
             // Dispatch confirmation delivery
-            ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, (int) Tpdu.TP_ST_SM_RECEIVED_BY_SME);
+            ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, (int) commandStatusCode);
             mcDispatcher.dispatch(call);
             return;
         }
-        // TODO set service message?
-        ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, errorCode);
+        // Notify an error to remote smsc.
+        ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.FAILED, commandStatusCode);
         mcDispatcher.dispatch(call);
     }
     
@@ -295,7 +300,7 @@ public class DeliverSmDialog extends Dialog {
     protected void invalidate() {
         if (!DialogState.close.equals(state)) {
             // No in close estate means an error occurred in the work flow.
-            gwProcessor.offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), errorCode == Data.ESME_ROK ? Data.ESME_RSYSERR : errorCode));
+            gwProcessor.offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));
         }
         super.invalidate();
     }

@@ -27,7 +27,6 @@ import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
 import com.nuevatel.mc.smpp.gw.exception.FailedBindOperationException;
 
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -36,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.net.SmtpManager;
 import org.smpp.Data;
 import org.smpp.ServerPDUEvent;
 import org.smpp.ServerPDUEventListener;
@@ -441,11 +439,10 @@ public class SmppClientProcessor {
         request.setSourceAddr(event.getSourceAddr());
         request.setDestAddr(event.getDestAddr());
         request.setReplaceIfPresentFlag(event.getReplaceIfPresentFlag());
-        // TODO how to avoid string conversion
+        request.setShortMessageData(new ByteBuffer(event.getData()));
+        // set encoding if it is present
         if (StringUtils.isEmptyOrNull(event.getEncoding())) {
-            request.setShortMessageData(new ByteBuffer(event.getData()));
-        } else {
-            request.setShortMessage(new String(event.getData(), event.getEncoding()), event.getEncoding());
+            request.setShortMessageEncoding(event.getEncoding());
         }
         request.setScheduleDeliveryTime(event.getScheduleDeliveryTime());
         request.setValidityPeriod(event.getValidityPeriod());

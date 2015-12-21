@@ -9,6 +9,7 @@ import com.nuevatel.mc.common.GenericApp;
 import com.nuevatel.mc.smpp.gw.appconn.ForwardSmOTask;
 import com.nuevatel.mc.smpp.gw.client.SmppClienGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
+import com.nuevatel.mc.smpp.gw.domain.SmppGwSession.MGMT_STATE;
 import com.nuevatel.mc.smpp.gw.server.SmppServerGwProcessor;
 import java.util.HashMap;
 import java.util.List;
@@ -29,10 +30,9 @@ import org.apache.logging.log4j.Logger;
  * @since 1.8
  */
 public class SmppGwApp extends GenericApp {
-    /* constants */
-    private static final int CORE_POOL_SIZE = 2;
+    
     private static Logger logger  = LogManager.getLogger(SmppGwApp.class);
-
+    
     /** The smppGwApp. */
     private static final SmppGwApp smppGwApp = new SmppGwApp();
 
@@ -63,7 +63,11 @@ public class SmppGwApp extends GenericApp {
             // Initialize processors
             ShutdownHook hook = new ShutdownHook(60, 1); // 60 timeout 1 thread
             service = Executors.newFixedThreadPool(smppGwSessionMap.size());
-            smppGwSessionMap.forEach((k, gwSession) -> {
+            // Select only active sessions
+            smppGwSessionMap.entrySet().stream().filter((entry)-> MGMT_STATE.ACTIVE.equals(entry.getValue().getMgmtState())).
+            forEach((entry) -> {
+                Integer k = entry.getKey();
+                SmppGwSession gwSession = entry.getValue();
                 SmppGwProcessor processor = makeGwProcessor(gwSession.getSmppType(), gwSession);
                 // Initialize gw processors
                 service.execute(()->processor.execute());

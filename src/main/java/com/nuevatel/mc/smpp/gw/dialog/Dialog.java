@@ -32,7 +32,7 @@ public abstract class Dialog {
     
     protected DialogState state = DialogState.created;
     
-    protected int errorCode = Data.ESME_ROK;
+    protected int commandStatusCode = Data.ESME_ROK;
     
     /**
      * 
@@ -48,7 +48,7 @@ public abstract class Dialog {
     
     public abstract void handleSmppEvent(ServerPDUEvent ev);
     
-    public abstract void handleMessage(Message msg);
+    public abstract void handleMcMessage(Message msg);
     
     public abstract void execute();
     

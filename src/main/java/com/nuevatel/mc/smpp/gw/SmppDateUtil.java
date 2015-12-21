@@ -4,6 +4,7 @@
 package com.nuevatel.mc.smpp.gw;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -26,6 +27,14 @@ public final class SmppDateUtil {
     
     private SmppDateUtil() {
         // No op. Prevent instantiation
+    }
+    
+    /**
+     * @param time Time to format.
+     * @return String representation for the SmppDatetime. <b>It is always in absolute format.</b>
+     */
+    public static String toSmppDatetime(LocalDateTime time) {
+        return format.format(time) + "000+";
     }
     
     /**

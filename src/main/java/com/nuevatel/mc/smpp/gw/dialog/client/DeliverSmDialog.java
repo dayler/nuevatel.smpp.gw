@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.nuevatel.mc.smpp.gw.dialog;
+package com.nuevatel.mc.smpp.gw.dialog.client;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -27,6 +27,9 @@ import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
+import com.nuevatel.mc.smpp.gw.dialog.Dialog;
+import com.nuevatel.mc.smpp.gw.dialog.DialogState;
+import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.tpdu.SmsDeliver;

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.nuevatel.mc.smpp.gw.dialog;
+package com.nuevatel.mc.smpp.gw.dialog.client;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -24,6 +24,9 @@ import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
+import com.nuevatel.mc.smpp.gw.dialog.Dialog;
+import com.nuevatel.mc.smpp.gw.dialog.DialogState;
+import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
 import com.nuevatel.mc.tpdu.SmsDeliver;
@@ -155,19 +158,19 @@ public class SubmitSmDialog extends Dialog {
                     mcDispatcher.dispatch(fwsmoRetCall);
                     invalidate();
                 } else if (pdu.isOk()) {
-                    if (!registeredDelivery) {
+                    if (registeredDelivery) {
+                        // dispatch ForwardSmORetAsyncCall
+                        commandStatusCode = Data.ESME_ROK;
+                        ForwardSmORetAsyncCall fwsmoRetCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);
+                        // dispatch async message
+                        mcDispatcher.dispatch(fwsmoRetCall);
+                    } else {
                         // if register delivery is not true, finish transaction,
                         // no await by response.
                         state = DialogState.close;
                         tpStatus = Tpdu.TP_ST_SM_RECEIVED_BY_SME;
                         commandStatusCode = Data.ESME_ROK;
                         invalidate();
-                    } else {
-                        // dispatch ForwardSmORetAsyncCall
-                        commandStatusCode = Data.ESME_ROK;
-                        ForwardSmORetAsyncCall fwsmoRetCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);
-                        // dispatch async message
-                        mcDispatcher.dispatch(fwsmoRetCall);
                     }
                 }
             } else if (pdu.isRequest()) {
@@ -225,5 +228,4 @@ public class SubmitSmDialog extends Dialog {
             logger.error("Failed to execute SubmitSmDialog...", ex);
         }
     }
-
 }

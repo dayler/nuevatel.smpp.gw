@@ -10,9 +10,9 @@ import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.McMessageId;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
-import com.nuevatel.mc.smpp.gw.dialog.DeliverSmDialog;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
+import com.nuevatel.mc.smpp.gw.dialog.client.DeliverSmDialog;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.CancelSmEvent;
 import com.nuevatel.mc.smpp.gw.event.DataSmEvent;
@@ -112,8 +112,6 @@ public class SmppClientProcessor {
     
     private SmppGwSession gwSession;
     
-    private boolean bound = false;
-    
     private Session smppSession = null;
 
     private AddressRange addressRange = new AddressRange();
@@ -121,6 +119,10 @@ public class SmppClientProcessor {
     private DialogService dialogService = AllocatorService.getDialogService();
     
     private McMessageId mcMsgId = new McMessageId();
+    
+    private boolean bound = false;
+    
+    private boolean running = false;
     
     public SmppClientProcessor(SmppGwSession gwSession,
                              BlockingQueue<ServerPDUEvent>serverPduEvents, 
@@ -157,7 +159,12 @@ public class SmppClientProcessor {
                               PDUException,
                               WrongSessionStateException,
                               IOException {
-        if (bound) {
+        if (!running) {
+            // Start processor thread
+            running = true;
+        }
+        
+        if (isBound()) {
             logger.warn("Already bound, unbind first. SmppSessionId=" + gwSession.getSmppSessionId());
         }
         // Do bind op
@@ -178,7 +185,7 @@ public class SmppClientProcessor {
         // Log response
         logger.info("Bind response: " + response.debugString());
         // Check if was succedded
-        if (bound = Data.ESME_ROK == response.getCommandStatus()) {
+        if (bound =  Data.ESME_ROK == response.getCommandStatus()) {
             logger.info("bind succedded");
         } else {
             logger.error("bind failed. commandStatus:{} bindResponse:", response.getCommandStatus(), response.debugString());
@@ -190,7 +197,7 @@ public class SmppClientProcessor {
      * Finish connection between ESME entity and SMSC (SMPP server). 
      */
     public void unbind() {
-        if (!bound) {
+        if (!isBound()) {
             logger.warn("Not bound, cannot unbind. SmppGwSessionId=" + gwSession.getSmppSessionId());
             return;
         }
@@ -205,7 +212,6 @@ public class SmppClientProcessor {
             logger.warn("Failed unbind.", ex);
         }
         logger.info("Unbind response: " + "Unbind response: " + response == null? null : response.debugString());
-        bound = false;
     }
     
     /**
@@ -214,19 +220,26 @@ public class SmppClientProcessor {
     public void receive() {
         logger.info("client.recieve...");
         try {
-            while (bound) {
+            while (isRunning()) {
                 try {
+                    if (!isBound()) {
+                        if (logger.isTraceEnabled()) {
+                            logger.trace("manager.receive()  Await until bound...");
+                        }
+                        // Await until bound
+                        Thread.sleep(500L);
+                        continue;
+                    }
                     // receive till bound
                     ServerPDUEvent smppEvent = serverPduEvents.poll(REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS); // 500ms
                     if (smppEvent == null) {
                         // time out
-                        // TODO
                         logger.trace("No events to process for smppGwId:{}", gwSession.getSmppGwId());
                         continue;
                     }
                     PDU pdu = smppEvent.getPDU();
                     if (pdu != null) {
-                        // Find dialog dispatch message to handle it, if it does not exists create new dialog for incoming messages.
+                        // Find dialog to dispatch message to handle it, if it does not exists create new dialog for incoming messages.
                         Dialog dialog = null;
                         Long dialogId = dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
                         if (dialogId != null && (dialog = dialogService.getDialog(dialogId)) != null) {
@@ -257,7 +270,7 @@ public class SmppClientProcessor {
                             }
                         }
                     }
-                } catch (InterruptedException ex) {
+                } catch (InterruptedException | ValueNotSetException | WrongSessionStateException | IOException ex) {
                     logger.error("On recieving event, the processor:{} ...", gwSession == null ? null : gwSession.getSmppGwId(), ex);
                 }
             }
@@ -280,12 +293,19 @@ public class SmppClientProcessor {
         return DISPATCH_EV_SOURCE_NOT_ALLOWED;
     }
 
+    //TODO move doEnquireLink
+    
     public void enquireLink() throws ValueNotSetException, // do enquireLink
-                                      TimeoutException, // do enquireLink
-                                      PDUException, // do enquireLink
-                                      WrongSessionStateException, // do enquireLink
-                                      IOException { // do enquireLink
-        smppSession.enquireLink();
+                                     TimeoutException, // do enquireLink
+                                     PDUException, // do enquireLink
+                                     WrongSessionStateException, // do enquireLink
+                                     IOException { // do enquireLink
+        if (isBound()) {
+            smppSession.enquireLink();
+            return;
+        }
+        
+        logger.warn("smppGwId:{} is not bound...", gwSession.getSmppGwId());
     }
 
     /**
@@ -294,21 +314,44 @@ public class SmppClientProcessor {
      */
     public void dispatch() {
         try {
-            while (bound) {
-                SmppEvent smppEvent = smppEvents.poll(TIME_OUT_MC_EVENT_QUEUE, TimeUnit.MILLISECONDS);
-                if (smppEvent == null) {
-                    // timeout
-                    continue;
+            while (isRunning()) {
+                try {
+                    if (!isBound()) {
+                        if (logger.isTraceEnabled()) {
+                            logger.trace("manager.dispatch() Await until bound...");
+                        }
+                        // Await until bound
+                        Thread.sleep(500);
+                        continue;
+                    }
+                    // get scheduled event
+                    SmppEvent smppEvent = smppEvents.poll(TIME_OUT_MC_EVENT_QUEUE, TimeUnit.MILLISECONDS);
+                    if (smppEvent == null) {
+                        // timeout or unbound
+                        continue;
+                    }
+                    // dispatch to MC
+                    dispatchEvent(smppEvent);
+                    logger.info("client.dispatch...");
+                } catch (IOException ex) {
+                    logger.warn("Failed to dispatch smppEvent:{}", smppEvents.toString());
+                    // schedule to reconnect
+                    bound = false;
                 }
-                // dispatch to MC
-                dispatchEvent(smppEvent);
-                logger.info("client.dispatch...");
             }
         } catch (Throwable ex) {
-            logger.error("Fatal Error, on stop manager.dispatch()", ex);
+            logger.error("Fatal Error, stop manager.dispatch()", ex);
         }
     }
     
+    public boolean isRunning() {
+        return running;
+    }
+    
+    public void shutdown() {
+        running = false;
+    }
+
     /**
      * Dispatch event to remote SMSC
      * 

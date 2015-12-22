@@ -40,7 +40,7 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
     
     private long enquireLinkPeriod;
     
-    private ScheduledExecutorService enquireLinkService = null;
+    private ScheduledExecutorService heartbeatService = Executors.newSingleThreadScheduledExecutor();
     
     /**
      * Initialize service processor
@@ -66,19 +66,19 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
                     SmppClientProcessor processor = new SmppClientProcessor(gwSession, serverPduEvents, smppEvents);
                     smppClientProcessorList.add(processor);
                     // do bind
-                    processor.bind();
+                    doBind(processor);
                     // dispatch thread
                     service.execute(() -> processor.dispatch());
                     // receive thread
                     service.execute(() -> processor.receive());
+                    // health check
                     // enquire link thread
                     if (enquireLinkPeriod > 0) {
-                        if (enquireLinkService == null) {
-                            enquireLinkService = Executors.newSingleThreadScheduledExecutor();
-                        }
-                        enquireLinkService.schedule(() -> doEnquireLink(processor), enquireLinkPeriod,
-                                TimeUnit.SECONDS);
+                        heartbeatService.scheduleAtFixedRate(() -> doEnquireLink(processor), enquireLinkPeriod, enquireLinkPeriod, TimeUnit.SECONDS);
                     }
+                    // auto reconnect task
+                    long autoReConnectPeriod = enquireLinkPeriod > 0 ? enquireLinkPeriod : 30L; // default 30s
+                    heartbeatService.scheduleAtFixedRate(() -> doBind(processor), autoReConnectPeriod, autoReConnectPeriod, TimeUnit.SECONDS);
                     logger.info("SmppClientProcessor was start [index={}]...", i);
                 } catch (Throwable ex) {
                     logger.error("At index {} cannot be start SmppClientProcessor...", i, ex);
@@ -89,6 +89,26 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
             logger.fatal("Failed to execute SmppClientGwProcessor[smppGwId:{}]...", gwSession.getSmppGwId(), ex);
             // try shutdown
             shutdown(60);
+        }
+    }
+    
+    private void doBind(SmppClientProcessor processor) {
+        try {
+            if (processor.isBound()) {
+                return;
+            }
+            // Try bind op
+            processor.bind();
+        } catch (Throwable ex) {
+            logger.error("Failed to bind. SmppGwId:{} with {}:{}...", gwSession.getSmppGwId(), gwSession.getSmscAddress(), gwSession.getSmscPort(), ex);
+            // try unbind if bind operation is trying.
+            doUnBind(processor);
+        }
+    }
+    
+    private void doUnBind(SmppClientProcessor processor) {
+        if (processor.isBound()) {
+            processor.unbind();
         }
     }
     
@@ -113,9 +133,9 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
                 }
             });
             // stop enquirelink service
-            if (enquireLinkService != null) {
-                enquireLinkService.shutdown();
-                enquireLinkService.awaitTermination(60, TimeUnit.SECONDS);
+            if (heartbeatService != null) {
+                heartbeatService.shutdown();
+                heartbeatService.awaitTermination(60, TimeUnit.SECONDS);
             }
             // stop executor service
             service.shutdown();

@@ -19,10 +19,8 @@ import org.smpp.TimeoutException;
 import org.smpp.WrongSessionStateException;
 import org.smpp.pdu.PDUException;
 
-import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
-import com.nuevatel.mc.smpp.gw.domain.PropName;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**

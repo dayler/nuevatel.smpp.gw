@@ -1,24 +1,19 @@
 package com.nuevatel.mc.smpp.gw.appconn;
 
-import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.nuevatel.common.appconn.*;
-import com.nuevatel.mc.appconn.ForwardSmICall;
+import com.nuevatel.common.appconn.AppMessages;
+import com.nuevatel.common.appconn.Conn;
+import com.nuevatel.common.appconn.Message;
+import com.nuevatel.common.appconn.Task;
 import com.nuevatel.mc.appconn.ForwardSmOCall;
 import com.nuevatel.mc.appconn.ForwardSmORet;
-import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.ProxyApp;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
-import com.nuevatel.mc.tpdu.SmsStatusReport;
-import com.nuevatel.mc.tpdu.TpAddress;
 
 /**
  * <p>The ForwardSmOTask class.</p> Handles <code>ForwardSmOCall</code> appconn message.This kind of message is received when is delivered a short

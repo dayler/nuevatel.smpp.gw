@@ -21,8 +21,8 @@ import org.smpp.pdu.PDUException;
 
 import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.PropName;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
+import com.nuevatel.mc.smpp.gw.domain.PropName;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**
@@ -53,7 +53,7 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
         super(gwSession);
         service = Executors.newFixedThreadPool(gwSession.getMaxBinds());
         // enquire link
-        enquireLinkPeriod = LongUtil.tryParse(AllocatorService.getProperties().getProperty(PropName.enquireLinkPeriod.property()), 0L);
+        enquireLinkPeriod = AllocatorService.getConfig().getEnquireLinkPeriod();
     }
     
     /**

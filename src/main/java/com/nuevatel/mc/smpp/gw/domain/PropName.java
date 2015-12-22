@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.nuevatel.mc.smpp.gw;
+package com.nuevatel.mc.smpp.gw.domain;
 
 /**
  * @author Ariel Salazar

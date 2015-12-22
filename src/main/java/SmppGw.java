@@ -56,6 +56,8 @@ public class SmppGw {
                 properties.load(reader);
                 // register properties
                 AllocatorService.setProperties(properties);
+                // Load config properties
+                AllocatorService.loadConfig(properties);
                 // Initialize DialogService
                 AllocatorService.initializeDialogService();
                 logger.info("DialogService - start");

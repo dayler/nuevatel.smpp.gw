@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
+import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.exception.NullDialogService;
 import com.nuevatel.mc.smpp.gw.exception.NullMcDispatcher;
 import com.nuevatel.mc.smpp.gw.exception.NullProperties;
@@ -26,6 +27,8 @@ public final class AllocatorService {
     private static DialogService dialogService = null;
     
     private static McDispatcher mcDispatcher = new McDispatcher();
+    
+    private static Config config = new Config();
     
     /**
      * Contains all processors registered in the app. Each processor is an instance by mc session. The sessions are defined on table <code>mc.mc_smpp_gw</code>.
@@ -91,5 +94,13 @@ public final class AllocatorService {
             throw new NullMcDispatcher();
         }
         mcDispatcher.shutdown();
+    }
+    
+    public static Config getConfig() {
+        return config;
+    }
+    
+    public static void loadConfig(Properties prop) {
+        config.load(prop);
     }
 }

@@ -5,7 +5,6 @@ package com.nuevatel.mc.smpp.gw.dialog;
 
 import java.time.ZonedDateTime;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -15,10 +14,7 @@ import com.nuevatel.common.cache.CacheBuilder;
 import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
 import com.nuevatel.common.cache.RemovalListener;
-import com.nuevatel.common.util.IntegerUtil;
-import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.PropName;
 import com.nuevatel.mc.smpp.gw.exception.NoDialogCachedObject;
 
 /**
@@ -31,8 +27,6 @@ public class DialogService {
     
     private LoadingCache<Long, Dialog>dialogCache;
     
-    private Properties properties = AllocatorService.getProperties();
-    
     /**
      * Map smpp message id with its corresponding dialog id.
      */
@@ -42,7 +36,7 @@ public class DialogService {
     
     public DialogService() {
         resolveLoadingCache();
-        taskService = Executors.newFixedThreadPool(IntegerUtil.tryParse(properties.getProperty(PropName.dialogcacheTaskConcurrencyLevel.property()), 2));
+        taskService = Executors.newFixedThreadPool(AllocatorService.getConfig().getDialogCacheTaskConcurrencyLevel());
     }
     
     public Long findDialogIdBySequenceNumber(int seqNumber) {
@@ -71,8 +65,8 @@ public class DialogService {
     }
     
     private void resolveLoadingCache() {
-        int size = IntegerUtil.tryParse(properties.getProperty(PropName.dialogcacheConcurrencyLevel.property()), 4);
-        long expireAfterWriteTime = LongUtil.tryParse(properties.getProperty(PropName.expireAfterWriteTime.property()), 3600000L);
+        int size = AllocatorService.getConfig().getDialogCacheConcurrencyLevel();
+        long expireAfterWriteTime = AllocatorService.getConfig().getDialogCacheExpireAfterWriteTime();
         dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime)
                                                     .setSize(size)
                                                     .setTimeUnit(TimeUnit.SECONDS)

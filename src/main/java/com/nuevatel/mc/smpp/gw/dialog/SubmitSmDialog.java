@@ -16,14 +16,12 @@ import org.smpp.pdu.PDU;
 
 import com.nuevatel.common.appconn.AppMessages;
 import com.nuevatel.common.appconn.Message;
-import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.mc.appconn.ForwardSmICall;
 import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
 import com.nuevatel.mc.appconn.Name;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.Constants;
-import com.nuevatel.mc.smpp.gw.PropName;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
@@ -83,7 +81,7 @@ public class SubmitSmDialog extends Dialog {
         this.fromName = fromName;
         this.toName = toName;
         this.smsDeliver = smsDeliver;
-        defaultValidityPeriod = LongUtil.tryParse(AllocatorService.getProperties().getProperty(PropName.defaultValidityPeriod.property()));
+        defaultValidityPeriod = AllocatorService.getConfig().getDefaultValidityPeriod();
     }
 
     /**

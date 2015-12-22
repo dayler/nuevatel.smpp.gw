@@ -5,12 +5,10 @@
  */
 package com.nuevatel.mc.smpp.gw.client;
 
-import com.nuevatel.common.util.LongUtil;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.McMessageId;
-import com.nuevatel.mc.smpp.gw.PropName;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.DeliverSmDialog;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
@@ -89,7 +87,7 @@ public class SmppClientProcessor {
 
     private static final long REQUEST_TIMEOUT_MS = 500;
     
-    private static long defaultValidityPeriod;
+    private static long defaultValidityPeriod = AllocatorService.getConfig().getDefaultValidityPeriod();
     
     /**
      * All incoming events from the SMSC (SMPP server)
@@ -123,10 +121,6 @@ public class SmppClientProcessor {
     private DialogService dialogService = AllocatorService.getDialogService();
     
     private McMessageId mcMsgId = new McMessageId();
-    
-    static {
-        defaultValidityPeriod = LongUtil.tryParse(AllocatorService.getProperties().getProperty(PropName.defaultValidityPeriod.property()), 86400000L);
-    }
     
     public SmppClientProcessor(SmppGwSession gwSession,
                              BlockingQueue<ServerPDUEvent>serverPduEvents, 

@@ -5,7 +5,6 @@
  */
 package com.nuevatel.mc.smpp.gw.client;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -78,7 +77,7 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
                     }
                     // auto reconnect task
                     long autoReConnectPeriod = enquireLinkPeriod > 0 ? enquireLinkPeriod : 30L; // default 30s
-                    heartbeatService.scheduleAtFixedRate(() -> doBind(processor), autoReConnectPeriod, autoReConnectPeriod, TimeUnit.SECONDS);
+                    heartbeatService.scheduleAtFixedRate(() -> tryReconnect(processor), autoReConnectPeriod, autoReConnectPeriod, TimeUnit.SECONDS);
                     logger.info("SmppClientProcessor was start [index={}]...", i);
                 } catch (Throwable ex) {
                     logger.error("At index {} cannot be start SmppClientProcessor...", i, ex);
@@ -101,14 +100,30 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
             processor.bind();
         } catch (Throwable ex) {
             logger.error("Failed to bind. SmppGwId:{} with {}:{}...", gwSession.getSmppGwId(), gwSession.getSmscAddress(), gwSession.getSmscPort(), ex);
-            // try unbind if bind operation is trying.
-            doUnBind(processor);
         }
     }
     
-    private void doUnBind(SmppClientProcessor processor) {
-        if (processor.isBound()) {
-            processor.unbind();
+    private void tryReconnect(SmppClientProcessor processor) {
+        if (!processor.isBound()) {
+            // try to reconnect.
+            // try unbind
+            try {
+                processor.unbind();
+            } catch (Throwable ex) {
+                logger.warn("On reconnection task, failed un unbind...");
+                if (logger.isTraceEnabled()) {
+                    logger.warn("Exception:", ex);
+                }
+            }
+            // try bind
+            try {
+                processor.bind();
+            } catch (Throwable ex) {
+                logger.warn("On reconnection task, failed bind. SmppGwId:{} with {}:{}...", gwSession.getSmppGwId(), gwSession.getSmscAddress(), gwSession.getSmscPort());
+                if (logger.isTraceEnabled()) {
+                    logger.warn("Exception:", ex);
+                }
+            }
         }
     }
     
@@ -116,7 +131,7 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
         try {
             clientProcessor.enquireLink();
             logger.debug("enquireLink...");
-        } catch (TimeoutException | PDUException | WrongSessionStateException | IOException ex) {
+        } catch (TimeoutException | PDUException | WrongSessionStateException ex) {
             logger.error("Failed enquireLink...", ex);
         }
     }

@@ -120,8 +120,6 @@ public class SmppClientProcessor {
     
     private McMessageId mcMsgId = new McMessageId();
     
-    private boolean bound = false;
-    
     private boolean running = false;
     
     public SmppClientProcessor(SmppGwSession gwSession,
@@ -141,7 +139,7 @@ public class SmppClientProcessor {
      * @return <code>true</code> if client is bound.
      */
     public boolean isBound() {
-        return bound;
+        return smppSession == null ? false : (smppSession.isBound() && smppSession.getConnection().isOpened());
     }
     
     /**
@@ -185,7 +183,7 @@ public class SmppClientProcessor {
         // Log response
         logger.info("Bind response: " + response.debugString());
         // Check if was succedded
-        if (bound =  Data.ESME_ROK == response.getCommandStatus()) {
+        if (isBound()) {
             logger.info("bind succedded");
         } else {
             logger.error("bind failed. commandStatus:{} bindResponse:", response.getCommandStatus(), response.debugString());
@@ -292,20 +290,24 @@ public class SmppClientProcessor {
         }
         return DISPATCH_EV_SOURCE_NOT_ALLOWED;
     }
-
-    //TODO move doEnquireLink
     
     public void enquireLink() throws ValueNotSetException, // do enquireLink
                                      TimeoutException, // do enquireLink
                                      PDUException, // do enquireLink
-                                     WrongSessionStateException, // do enquireLink
-                                     IOException { // do enquireLink
-        if (isBound()) {
-            smppSession.enquireLink();
-            return;
+                                     WrongSessionStateException { // do enquireLin
+        try {
+            if (isBound()) {
+                smppSession.enquireLink();
+                return;
+            }
+
+            logger.warn("smppGwId:{} is not bound...", gwSession.getSmppGwId());
+        } catch (IOException ex) {
+            logger.warn("Enquirelink failed...");
+            if (logger.isTraceEnabled()) {
+                logger.warn("Exception:", ex);
+            }
         }
-        
-        logger.warn("smppGwId:{} is not bound...", gwSession.getSmppGwId());
     }
 
     /**
@@ -321,13 +323,13 @@ public class SmppClientProcessor {
                             logger.trace("manager.dispatch() Await until bound...");
                         }
                         // Await until bound
-                        Thread.sleep(500);
+                        Thread.sleep(500L);
                         continue;
                     }
                     // get scheduled event
                     SmppEvent smppEvent = smppEvents.poll(TIME_OUT_MC_EVENT_QUEUE, TimeUnit.MILLISECONDS);
                     if (smppEvent == null) {
-                        // timeout or unbound
+                        // timeout
                         continue;
                     }
                     // dispatch to MC
@@ -335,8 +337,9 @@ public class SmppClientProcessor {
                     logger.info("client.dispatch...");
                 } catch (IOException ex) {
                     logger.warn("Failed to dispatch smppEvent:{}", smppEvents.toString());
-                    // schedule to reconnect
-                    bound = false;
+                    if (logger.isTraceEnabled()) {
+                        logger.warn("Exception:", ex);
+                    }
                 }
             }
         } catch (Throwable ex) {

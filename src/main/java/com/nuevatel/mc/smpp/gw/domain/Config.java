@@ -42,6 +42,11 @@ public class Config {
      */
     private long dialogCacheExpireAfterWriteTime;
     
+    /**
+     * Time(expresen in milliseconds) to await by an connection request before to pass next cycle. Only is used in smsc mode. Default value 500ms
+     */
+    private long serverListenerReceiveTimeout;
+    
     public void load(Properties prop) {
         Parameters.checkNull(prop, "prop");
         defaultValidityPeriod = LongUtil.tryParse(prop.getProperty(PropName.defaultValidityPeriod.property()), 86400L);
@@ -49,6 +54,7 @@ public class Config {
         dialogCacheConcurrencyLevel = IntegerUtil.tryParse(prop.getProperty(PropName.dialogcacheConcurrencyLevel.property()), 8);
         dialogCacheTaskConcurrencyLevel = IntegerUtil.tryParse(prop.getProperty(PropName.dialogcacheTaskConcurrencyLevel.property()), 4);
         dialogCacheExpireAfterWriteTime = LongUtil.tryParse(PropName.expireAfterWriteTime.property(), 86400L);
+        serverListenerReceiveTimeout = LongUtil.tryParse(prop.getProperty(PropName.serverlistenerReceiveTimeout.property()), 500L);
     }
     
     public long getDefaultValidityPeriod() {
@@ -69,5 +75,9 @@ public class Config {
 
     public int getDialogCacheTaskConcurrencyLevel() {
         return dialogCacheTaskConcurrencyLevel;
+    }
+    
+    public long getServerListenerReceiveTimeout() {
+        return serverListenerReceiveTimeout;
     }
 }

@@ -33,6 +33,9 @@ public class SmppClienGwProcessor extends SmppGwProcessor {
     
     private static Logger logger = LogManager.getLogger(SmppClienGwProcessor.class);
     
+    /**
+     * One processor for each binding client.
+     */
     private List<SmppClientProcessor>smppClientProcessorList = new ArrayList<>();
     
     private ExecutorService service;

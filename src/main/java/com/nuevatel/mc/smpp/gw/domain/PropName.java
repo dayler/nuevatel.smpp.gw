@@ -13,6 +13,7 @@ public enum PropName {
     dialogcacheTaskConcurrencyLevel("smppgw.dialogcache.task.concurrencyLevel"),
     enquireLinkPeriod("smppgw.enquireLinkPeriod"),
     defaultValidityPeriod("smppgw.defaultValidityPeriod"),
+    serverlistenerReceiveTimeout("smppgw.serverlistener.receiveTimeout"),
     ;
     
     private String property;

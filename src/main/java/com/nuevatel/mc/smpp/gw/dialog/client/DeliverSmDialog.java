@@ -67,6 +67,7 @@ public class DeliverSmDialog extends Dialog {
     public DeliverSmDialog(long messageId, int processorId, DeliverSM deliverPdu) {
         super(messageId, processorId);
         Parameters.checkNull(deliverPdu, "deliverPdu");
+        // select processor
         gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
         this.deliverPdu = deliverPdu;
     }
@@ -79,8 +80,9 @@ public class DeliverSmDialog extends Dialog {
         try {
             state = DialogState.init;
             // do received ok response to remote smsc
+            // get register delivery
             registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED;
-            // create SmsDeliver
+            // create SmsSubmit
             byte encoding;
             switch (deliverPdu.getShortMessageEncoding()) {
             case Constants.CS_GSM7:
@@ -187,9 +189,6 @@ public class DeliverSmDialog extends Dialog {
             switch (smsSr.getTpSt()) {
             case Tpdu.TP_ST_SM_RECEIVED_BY_SME:
             case Tpdu.TP_ST_SM_REPLACED_BY_SC:
-                // deliver ROK sm response, message delivered.
-                DefaultResponseOKEvent respEsmeRok = new DefaultResponseOKEvent(deliverPdu);
-                gwProcessor.offerSmppEvent(respEsmeRok);
                 commandStatusCode = Data.ESME_ROK;
                 state = DialogState.close;
                 invalidate();
@@ -289,6 +288,9 @@ public class DeliverSmDialog extends Dialog {
     public void execute() {
         // serviceMessage = smpp commandStatus
         if (DialogState.close.equals(state) && commandStatusCode == Data.ESME_ROK) {
+            // deliver ROK sm response, message delivered.
+            DefaultResponseOKEvent respEsmeROk = new DefaultResponseOKEvent(deliverPdu);
+            gwProcessor.offerSmppEvent(respEsmeROk);
             // Dispatch confirmation delivery
             ForwardSmORetAsyncCall call = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, (int) commandStatusCode);
             mcDispatcher.dispatch(call);
@@ -301,6 +303,7 @@ public class DeliverSmDialog extends Dialog {
     
     @Override
     protected void invalidate() {
+        // TODO Dispatch failed deliver resp
         if (!DialogState.close.equals(state)) {
             // No in close estate means an error occurred in the work flow.
             gwProcessor.offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));

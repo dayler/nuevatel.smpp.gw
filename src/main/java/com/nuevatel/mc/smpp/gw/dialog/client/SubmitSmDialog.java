@@ -29,16 +29,20 @@ import com.nuevatel.mc.smpp.gw.dialog.DialogState;
 import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
-import com.nuevatel.mc.tpdu.SmsDeliver;
 import com.nuevatel.mc.tpdu.SmsStatusReport;
+import com.nuevatel.mc.tpdu.SmsSubmit;
 import com.nuevatel.mc.tpdu.TpAddress;
 import com.nuevatel.mc.tpdu.TpDcs;
-import com.nuevatel.mc.tpdu.TpUd;
 import com.nuevatel.mc.tpdu.Tpdu;
 
 /**
- * Handle outgoig message rom local MC to remote SMSC.
+ * Handle outgoig message from local MC to remote SMSC.
  * <br/>
+ * (1) Receive deliver_sm and create new SubmitSmDialog. Create SmsSubmit MC message, dispatch it to McDisdpatcher.<br/>
+ * (1) Check if RDS is enabled.<br/>
+ * (1) For RDS true await confirmation.<br/>
+ * (1) For RDS true, receive FowardSmOCall(SmsStatusReport) confirmation message.<br/>
+ * (1) Dispatch deliver response<br/>
  * 
  * @author Ariel Salazar
  *
@@ -54,39 +58,38 @@ public class SubmitSmDialog extends Dialog {
     @SuppressWarnings("unused")
     private long smMessageId;
     
-    @SuppressWarnings("unused")
     private Name fromName;
     
     private Name toName;
     
-    private SmsDeliver smsDeliver;
+    private SmsSubmit smsSubmit;
     
     private long defaultValidityPeriod;
     
-    private byte tpStatus = Tpdu.TP_ST_ERROR_IN_SME;
-    
+    private byte tpStatus = Tpdu.TP_ST_PERMANENT_ERROR;
+
     public SubmitSmDialog(long messageId,
                           int processorId, // smppGwId
                           long smMessageId,
                           byte registeredDelivery,
                           Name fromName,
                           Name toName,
-                          SmsDeliver smsDeliver) {
+                          SmsSubmit smsSubmit) {
         super(messageId, processorId);
         
         Parameters.checkNull(fromName, "fromName");
         Parameters.checkNull(toName, "toName");
-        Parameters.checkNull(smsDeliver, "smsDeliver");
+        Parameters.checkNull(smsSubmit, "smsDeliver");
         
         gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
         this.registeredDelivery = (registeredDelivery & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED; 
         this.smMessageId = smMessageId;
         this.fromName = fromName;
         this.toName = toName;
-        this.smsDeliver = smsDeliver;
+        // this.smsDeliver = smsDeliver;
         defaultValidityPeriod = AllocatorService.getConfig().getDefaultValidityPeriod();
     }
-
+    
     /**
      * {@inheritDoc}
      */
@@ -96,17 +99,15 @@ public class SubmitSmDialog extends Dialog {
             state = DialogState.init;
             // Prepare SmppEvent
             SubmitSmppEvent event = new SubmitSmppEvent(dialogId);
-            Address sourceAddr = new Address(smsDeliver.getTpOa().getTon(), smsDeliver.getTpOa().getNpi(), smsDeliver.getTpOa().getAddress());
+            Address sourceAddr = new Address((byte)(fromName.getType() & TpAddress.TON), (byte)(fromName.getType() & TpAddress.NPI), fromName.getName());
             event.setSourceAddr(sourceAddr);
             Address destAddr = new Address((byte)(toName.getType() & TpAddress.TON), (byte)(toName.getType() & TpAddress.NPI), toName.getName());
             event.setDestAddr(destAddr);
             // replcae if present
             event.setReplaceIfPresentFlag((byte)Data.SM_REPLACE);
-            event.setData(smsDeliver.getTpdu());
-            // get tpdu
-            TpUd tpUd = new TpUd(smsDeliver.getTpUdhi(), smsDeliver.getTpDcs(), smsDeliver.getTpUdl(), smsDeliver.getTpdu());
+            event.setData(smsSubmit.getTpdu());
             // select charset
-            switch (tpUd.getCharSet()) {
+            switch (smsSubmit.getTpDcs().getCharSet()) {
             case TpDcs.CS_GSM7:
                 event.setEncoding(Constants.CS_GSM7);
                 break;
@@ -121,7 +122,7 @@ public class SubmitSmDialog extends Dialog {
                 break;
             }
             // serviceCentre timestamp
-            event.setScheduleDeliveryTime(SmppDateUtil.toSmppDatetime(smsDeliver.getTpScts()));
+            event.setScheduleDeliveryTime(SmppDateUtil.toSmppDatetime(smsSubmit.getTpVp()));
             // use default validity period
             ZonedDateTime validityPeriod = defaultValidityPeriod > 0 ? ZonedDateTime.now(ZoneId.of("UTC")).plus(defaultValidityPeriod, ChronoUnit.MILLIS) : ZonedDateTime.now(ZoneId.of("UTC"));
             event.setValidityPeriod(SmppDateUtil.toSmppDatetime(validityPeriod));
@@ -129,7 +130,7 @@ public class SubmitSmDialog extends Dialog {
             // default message mode, default message type
             byte esmClass = (byte)(0x00 /* default message mode */
                             | 0x00 /* default message type */
-                            | (smsDeliver.getTpUdhi() ? 0x40/* udhi present */ : 0x00) | (smsDeliver.getTpRp() ? 0x80 /* reply path present */ : 0x0));
+                            | (smsSubmit.getTpUdhi() ? 0x40/* udhi present */ : 0x00) | (smsSubmit.getTpRp() ? 0x80 /* reply path present */ : 0x0));
             event.setEsmClass(esmClass);
             // Set default protocol id
             event.setProtocolId(Data.DFLT_PROTOCOLID);
@@ -170,6 +171,9 @@ public class SubmitSmDialog extends Dialog {
                         state = DialogState.close;
                         tpStatus = Tpdu.TP_ST_SM_RECEIVED_BY_SME;
                         commandStatusCode = Data.ESME_ROK;
+                        ForwardSmORetAsyncCall fwsmoRetCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);
+                        // dispatch async message
+                        mcDispatcher.dispatch(fwsmoRetCall);
                         invalidate();
                     }
                 }
@@ -227,5 +231,11 @@ public class SubmitSmDialog extends Dialog {
         } catch (Throwable ex) {
             logger.error("Failed to execute SubmitSmDialog...", ex);
         }
+    }
+    
+    @Override
+    protected void invalidate() {
+        // TODO Auto-generated method stub
+        super.invalidate();
     }
 }

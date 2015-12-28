@@ -43,9 +43,14 @@ public class Config {
     private long dialogCacheExpireAfterWriteTime;
     
     /**
-     * Time(expresen in milliseconds) to await by an connection request before to pass next cycle. Only is used in smsc mode. Default value 500ms
+     * Time(expressed in milliseconds) to await by an connection request before to pass next cycle. Only is used in smsc mode. Default value 500ms
      */
     private long serverListenerReceiveTimeout;
+    
+    /**
+     * Time(expressed in milliseconds) to await by incoming smpp message. 
+     */
+    private long serverReceiverTimeout;
     
     public void load(Properties prop) {
         Parameters.checkNull(prop, "prop");
@@ -79,5 +84,9 @@ public class Config {
     
     public long getServerListenerReceiveTimeout() {
         return serverListenerReceiveTimeout;
+    }
+    
+    public long getServerReceiverTimeout() {
+        return serverReceiverTimeout;
     }
 }

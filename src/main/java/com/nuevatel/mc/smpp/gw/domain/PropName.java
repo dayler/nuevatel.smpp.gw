@@ -14,6 +14,7 @@ public enum PropName {
     enquireLinkPeriod("smppgw.enquireLinkPeriod"),
     defaultValidityPeriod("smppgw.defaultValidityPeriod"),
     serverlistenerReceiveTimeout("smppgw.serverlistener.receiveTimeout"),
+    serverReceiverTimeout("smppgw.serverreceiver.timeout"),
     ;
     
     private String property;

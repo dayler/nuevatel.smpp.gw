@@ -8,6 +8,7 @@ package com.nuevatel.mc.smpp.gw.client;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.smpp.gw.McMessageId;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
@@ -77,15 +78,11 @@ public class SmppClientProcessor {
     private static final int DISPATCH_EV_SOURCE_NOT_ALLOWED = 1;
     
     private static final int DISPATCH_EV_OK = 0;
-
-    private static final int TIME_OUT_MC_EVENT_QUEUE = 500;
-
+    
     /**
      * To receive sync response
      */
     private static final int RECIEVE_TIMEOUT = 20000;
-
-    private static final long REQUEST_TIMEOUT_MS = 500;
     
     private static long defaultValidityPeriod = AllocatorService.getConfig().getDefaultValidityPeriod();
     
@@ -229,7 +226,7 @@ public class SmppClientProcessor {
                         continue;
                     }
                     // receive till bound
-                    ServerPDUEvent smppEvent = serverPduEvents.poll(REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS); // 500ms
+                    ServerPDUEvent smppEvent = serverPduEvents.poll(Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS); // 500ms
                     if (smppEvent == null) {
                         // time out
                         logger.trace("No events to process for smppGwId:{}", gwSession.getSmppGwId());
@@ -285,7 +282,7 @@ public class SmppClientProcessor {
      * @throws InterruptedException 
      */
     public int offerSmppEvent(SmppEvent event) throws InterruptedException {
-        if (smppEvents.offer(event, TIME_OUT_MC_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
+        if (smppEvents.offer(event, Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
             return DISPATCH_EV_OK;
         }
         return DISPATCH_EV_SOURCE_NOT_ALLOWED;
@@ -327,14 +324,14 @@ public class SmppClientProcessor {
                         continue;
                     }
                     // get scheduled event
-                    SmppEvent smppEvent = smppEvents.poll(TIME_OUT_MC_EVENT_QUEUE, TimeUnit.MILLISECONDS);
+                    SmppEvent smppEvent = smppEvents.poll(Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS);
                     if (smppEvent == null) {
                         // timeout
                         continue;
                     }
-                    // dispatch to MC
+                    // dispatch to remote SMSC
                     dispatchEvent(smppEvent);
-                    logger.info("client.dispatch...");
+                    logger.trace("client.dispatch[{}]...", smppEvent.toString());
                 } catch (IOException ex) {
                     logger.warn("Failed to dispatch smppEvent:{}", smppEvents.toString());
                     if (logger.isTraceEnabled()) {
@@ -617,13 +614,13 @@ public class SmppClientProcessor {
                 return;
             }
             try {
-                if (!serverEvents.offer(pduEvent, REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                if (!serverEvents.offer(pduEvent, Constants.TIMEOUT_REQUEST_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
                     // warn the queue rejects the event
                     logger.warn("Failed to offer serverPDUEvent:{}", pduEvent.getPDU().debugString());
                 }
             } catch (InterruptedException ex) {
                 // On offer event
-                logger.error("On handleServerPDUEvent", ex);
+                logger.error("On handleServerPDUEvent...", ex);
             }
         }
     }

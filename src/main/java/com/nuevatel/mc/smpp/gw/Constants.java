@@ -14,6 +14,13 @@ public final class Constants {
     public static final String CS_UCS2 = "UTF-16BE";
     
     /**
+     * Timeout (in milliseconds) to poll event from queue.
+     */
+    public static final long TIMEOUT_POLL_EVENT_QUEUE = 500L;
+    
+    public static final long TIMEOUT_REQUEST_EVENT_QUEUE = 500L;
+    
+    /**
      * ESM_CLASS message mode mask (1-0)
      */
     public static final int SM_MESSAGE_MODE_MASK = 0x03;

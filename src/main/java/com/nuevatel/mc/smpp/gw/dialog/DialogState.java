@@ -19,11 +19,21 @@ public enum DialogState {
      */
     init,
     /**
+     * Dialog is awaiting by resp/req(delivery recipient).
+     */
+    awaiting_0,
+    awaiting_1,
+    awaiting_2,
+    /**
+     * Dialog is forwarding to next step.
+     */
+    forward,
+    /**
      * Dialog in close state. All process was succeeded.
      */
     close,
     /**
-     * Dialog has a controled fail.
+     * Dialog has a controlled fail.
      */
     failed,
     ;

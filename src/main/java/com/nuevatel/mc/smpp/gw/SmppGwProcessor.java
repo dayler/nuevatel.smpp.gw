@@ -22,8 +22,6 @@ import com.nuevatel.mc.smpp.gw.event.SmppEvent;
  */
 public abstract class SmppGwProcessor implements Processor {
     
-    protected static final int TIME_OUT_SMPP_EVENT_QUEUE = 500;
-    
     protected SmppGwSession gwSession;
     
     /**

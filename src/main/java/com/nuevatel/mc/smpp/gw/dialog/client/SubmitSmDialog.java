@@ -21,22 +21,23 @@ import com.nuevatel.mc.appconn.ForwardSmICall;
 import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
 import com.nuevatel.mc.appconn.Name;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogState;
 import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
+import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
+import com.nuevatel.mc.smpp.gw.util.EsmClass;
+import com.nuevatel.mc.smpp.gw.util.TpDcsUtils;
 import com.nuevatel.mc.tpdu.SmsStatusReport;
 import com.nuevatel.mc.tpdu.SmsSubmit;
 import com.nuevatel.mc.tpdu.TpAddress;
-import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.Tpdu;
 
 /**
- * Handle outgoig message from local MC to remote SMSC.
+ * Handle outgoing message from local MC to remote SMSC.
  * <br/>
  * (1) Receive deliver_sm and create new SubmitSmDialog. Create SmsSubmit MC message, dispatch it to McDisdpatcher.<br/>
  * (1) Check if RDS is enabled.<br/>
@@ -86,8 +87,8 @@ public class SubmitSmDialog extends Dialog {
         this.smMessageId = smMessageId;
         this.fromName = fromName;
         this.toName = toName;
-        // this.smsDeliver = smsDeliver;
         defaultValidityPeriod = AllocatorService.getConfig().getDefaultValidityPeriod();
+        this.smsSubmit = smsSubmit;
     }
     
     /**
@@ -96,7 +97,7 @@ public class SubmitSmDialog extends Dialog {
     @Override
     public void init() {
         try {
-            state = DialogState.init;
+            state = DialogState.forward;
             // Prepare SmppEvent
             SubmitSmppEvent event = new SubmitSmppEvent(dialogId);
             Address sourceAddr = new Address((byte)(fromName.getType() & TpAddress.TON), (byte)(fromName.getType() & TpAddress.NPI), fromName.getName());
@@ -107,20 +108,7 @@ public class SubmitSmDialog extends Dialog {
             event.setReplaceIfPresentFlag((byte)Data.SM_REPLACE);
             event.setData(smsSubmit.getTpdu());
             // select charset
-            switch (smsSubmit.getTpDcs().getCharSet()) {
-            case TpDcs.CS_GSM7:
-                event.setEncoding(Constants.CS_GSM7);
-                break;
-            case TpDcs.CS_UCS2:
-                event.setEncoding(Constants.CS_UCS2);
-                break;
-            case TpDcs.CS_8_BIT:
-                // no op
-                break;
-            default:
-                event.setEncoding(Constants.CS_GSM7);
-                break;
-            }
+            event.setEncoding(TpDcsUtils.resolveSmppEncoding(smsSubmit.getTpDcs().getCharSet()));
             // serviceCentre timestamp
             event.setScheduleDeliveryTime(SmppDateUtil.toSmppDatetime(smsSubmit.getTpVp()));
             // use default validity period
@@ -128,13 +116,17 @@ public class SubmitSmDialog extends Dialog {
             event.setValidityPeriod(SmppDateUtil.toSmppDatetime(validityPeriod));
             // esm_class
             // default message mode, default message type
-            byte esmClass = (byte)(0x00 /* default message mode */
-                            | 0x00 /* default message type */
-                            | (smsSubmit.getTpUdhi() ? 0x40/* udhi present */ : 0x00) | (smsSubmit.getTpRp() ? 0x80 /* reply path present */ : 0x0));
-            event.setEsmClass(esmClass);
+            EsmClass esmClass = new EsmClass(false, smsSubmit.getTpUdhi(), smsSubmit.getTpRp());
+            event.setEsmClass(esmClass.getValue());
             // Set default protocol id
             event.setProtocolId(Data.DFLT_PROTOCOLID);
+            // offer smppevent
+            state = DialogState.forward;
+            gwProcessor.offerSmppEvent(event);
+            // awaiting by response
+            state = DialogState.awaiting_0;
         } catch (Throwable ex) {
+            state = DialogState.failed;
             logger.warn("Failed to initialize SubmitSmDialog.", ex);
             // nack
             commandStatusCode = Data.ESME_RSYSERR;
@@ -158,13 +150,17 @@ public class SubmitSmDialog extends Dialog {
                     // dispatch failed message
                     mcDispatcher.dispatch(fwsmoRetCall);
                     invalidate();
-                } else if (pdu.isOk()) {
+                } else if (pdu.isOk() && Data.SUBMIT_SM_RESP == pdu.getCommandId()) {
                     if (registeredDelivery) {
+                        // received response, go forward
+                        state = DialogState.forward;
                         // dispatch ForwardSmORetAsyncCall
                         commandStatusCode = Data.ESME_ROK;
                         ForwardSmORetAsyncCall fwsmoRetCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);
-                        // dispatch async message
+                        // dispatch async message to confirm delivery
                         mcDispatcher.dispatch(fwsmoRetCall);
+                        // awaiting confirmation delivery
+                        state = DialogState.awaiting_1;
                     } else {
                         // if register delivery is not true, finish transaction,
                         // no await by response.
@@ -172,21 +168,35 @@ public class SubmitSmDialog extends Dialog {
                         tpStatus = Tpdu.TP_ST_SM_RECEIVED_BY_SME;
                         commandStatusCode = Data.ESME_ROK;
                         ForwardSmORetAsyncCall fwsmoRetCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);
-                        // dispatch async message
+                        // dispatch async message to confirm delivery
                         mcDispatcher.dispatch(fwsmoRetCall);
                         invalidate();
                     }
+                } else {
+                    // pdu is not ok
+                    state = DialogState.failed;
+                    tpStatus = Tpdu.TP_ST_ERROR_IN_SME;
+                    // Notify to mc failed
+                    commandStatusCode = pdu.getCommandStatus();
+                    ForwardSmORetAsyncCall fwsmoRetCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.FAILED, commandStatusCode);
+                    // dispatch async message to confirm delivery
+                    mcDispatcher.dispatch(fwsmoRetCall);
+                    invalidate();
                 }
             } else if (pdu.isRequest()) {
                 // handle Report delivery response
                 if (pdu.getCommandId() == Data.DELIVER_SM) {
+                    // forward resp and confirmation delivery to mc
+                    state = DialogState.forward;
                     // only on register_delivery
                     gwProcessor.offerSmppEvent(new DefaultResponseOKEvent(pdu));
                     commandStatusCode = Data.ESME_ROK;
+                    // Close dialog, no more steps
                     state = DialogState.close;
                     tpStatus = Tpdu.TP_ST_SM_RECEIVED_BY_SME;
                     invalidate();
                 }
+                // ignore in other case.
             }
         } catch (Throwable ex) {
             logger.error("Failed to handle ServerPDUEvent:{}", ev.getPDU() != null ? null : ev.getPDU().debugString(), ex);
@@ -206,21 +216,44 @@ public class SubmitSmDialog extends Dialog {
      */
     @Override
     public DialogType getType() {
-        return DialogType.submitSm;
+        return DialogType.esme_submit;
     }
     
     @Override
     public void execute() {
-        if (!registeredDelivery) {
-            // No register delivery
-            return;
-        }
         try {
+            if (!DialogState.close.equals(state)) {
+                if (!DialogState.forward.equals(state)) {
+                    // No in close estate means an error occurred in the work
+                    // flow.
+                    gwProcessor.offerSmppEvent(new GenericNAckEvent(getCurrentSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));
+                } else if (DialogState.awaiting_0.equals(state)) {
+                    // submit_sm_resp was not received
+                    commandStatusCode = Data.ESME_RSYSERR;
+                    ForwardSmORetAsyncCall fwsmoAsyncCall = new ForwardSmORetAsyncCall(dialogId, AppMessages.FAILED, commandStatusCode);
+                    mcDispatcher.dispatch(fwsmoAsyncCall);
+                } else if (DialogState.awaiting_1.equals(state)) {
+                    // delivery_sm confirmation never received
+                    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+                    TpAddress destAddr = new TpAddress((byte) (toName.getType() & TpAddress.TON), (byte) (toName.getType() & TpAddress.NPI), toName.getName());
+                    SmsStatusReport smsSr = new SmsStatusReport(false, false, false, (byte) 0x0, destAddr, now, now, tpStatus);
+                    ForwardSmICall fwsmiCall = new ForwardSmICall(dialogId, smsSr.getTpdu());
+                    Message msg = mcDispatcher.dispatchAndWait(fwsmiCall);
+                    if (msg == null || msg.getByte(AppMessages.RET_IE) == AppMessages.FAILED) {
+                        // failed
+                        logger.warn("Failed to dispatch confirmation delivery to MC. messageId:{}", dialogId);
+                    }
+                }
+            }
+
+            if (!registeredDelivery) {
+                // No register delivery
+                return;
+            }
             TpAddress recipientAddress = new TpAddress((byte) (toName.getType() & TpAddress.TON), (byte) (toName.getType() & TpAddress.NPI), toName.getName());
-            LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
+            LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
             // SmsStatusReport
-            // boolean tpUdhi, boolean tpMms, boolean tpSrq, byte tpMr,
-            // TpAddress tpRa, LocalDateTime tpScts, LocalDateTime tpDt, byte tpSt
+            // boolean tpUdhi, boolean tpMms, boolean tpSrq, byte tpMr, TpAddress tpRa, LocalDateTime tpScts, LocalDateTime tpDt, byte tpSt
             SmsStatusReport smsSr = new SmsStatusReport(false, false, false, (byte) 0, recipientAddress/* dest addr */, now, now, tpStatus);
             ForwardSmICall fwsmiCall = new ForwardSmICall(dialogId, smsSr.getTpdu());
             Message msg = mcDispatcher.dispatchAndWait(fwsmiCall);
@@ -231,11 +264,5 @@ public class SubmitSmDialog extends Dialog {
         } catch (Throwable ex) {
             logger.error("Failed to execute SubmitSmDialog...", ex);
         }
-    }
-    
-    @Override
-    protected void invalidate() {
-        // TODO Auto-generated method stub
-        super.invalidate();
     }
 }

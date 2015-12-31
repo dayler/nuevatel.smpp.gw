@@ -55,14 +55,12 @@ import org.smpp.pdu.PDU;
 import org.smpp.pdu.PDUException;
 import org.smpp.pdu.QuerySM;
 import org.smpp.pdu.ReplaceSM;
-import org.smpp.pdu.Response;
 import org.smpp.pdu.SubmitSM;
 import org.smpp.pdu.UnbindResp;
 import org.smpp.pdu.ValueNotSetException;
 import org.smpp.util.ByteBuffer;
 import org.smpp.util.NotEnoughDataInByteBufferException;
 import org.smpp.util.TerminatingZeroNotFoundException;
-import org.smpp.pdu.Request;
 
 import static com.nuevatel.common.util.Util.*;
 
@@ -74,10 +72,6 @@ import static com.nuevatel.common.util.Util.*;
 public class SmppClientProcessor {
     
     private static Logger logger = LogManager.getLogger(SmppClientProcessor.class);
-    
-    private static final int DISPATCH_EV_SOURCE_NOT_ALLOWED = 1;
-    
-    private static final int DISPATCH_EV_OK = 0;
     
     /**
      * To receive sync response
@@ -248,24 +242,28 @@ public class SmppClientProcessor {
                                 System.out.println("******* " + pdu.debugString() + " time " + ZonedDateTime.now().toString());
                                 // SmppSessionId is the processor identifier.
                                 Dialog deliverSmDialog = new DeliverSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
-                                                                                      gwSession.getSmppSessionId(), // Id to identify the processor
-                                                                                      (DeliverSM) pdu); // Pdu
+                                                                            gwSession.getSmppSessionId()); // Id to identify the processor
                                 // Register and init new dialog
                                 ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
                                 long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((DeliverSM)pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
                                 dialogService.putDialog(deliverSmDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : defaultValidityPeriod);
                                 // Initialize dialog
                                 deliverSmDialog.init();
+                                deliverSmDialog.handleSmppEvent(smppEvent);
                             } else {
-                                // ignore only send ok
+                                // unknow / unsupported smpp message
                                 if (pdu.isRequest()) {
-                                    Response response = ((Request)pdu).getResponse();
-                                    smppSession.respond(response);
+                                    // if is a request return NACK
+                                    GenericNAckEvent nackEv = new GenericNAckEvent(pdu.getSequenceNumber(), Data.ESME_RINVCMDID);
+                                    // Schedule to dispatch.
+                                    offerSmppEvent(nackEv);
+                                } else {
+                                    // For a response ignore it. do nothing.
                                 }
                             }
                         }
                     }
-                } catch (InterruptedException | ValueNotSetException | WrongSessionStateException | IOException ex) {
+                } catch (InterruptedException ex) {
                     logger.error("On recieving event, the processor:{} ...", gwSession == null ? null : gwSession.getSmppGwId(), ex);
                 }
             }
@@ -282,10 +280,10 @@ public class SmppClientProcessor {
      * @throws InterruptedException 
      */
     public int offerSmppEvent(SmppEvent event) throws InterruptedException {
-        if (smppEvents.offer(event, Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
-            return DISPATCH_EV_OK;
+        if (smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
+            return Constants.DISPATCH_EV_OK;
         }
-        return DISPATCH_EV_SOURCE_NOT_ALLOWED;
+        return Constants.DISPATCH_EV_SOURCE_NOT_ALLOWED;
     }
     
     public void enquireLink() throws ValueNotSetException, // do enquireLink
@@ -313,6 +311,7 @@ public class SmppClientProcessor {
      */
     public void dispatch() {
         try {
+            SmppEvent smppEvent = null;
             while (isRunning()) {
                 try {
                     if (!isBound()) {
@@ -324,7 +323,7 @@ public class SmppClientProcessor {
                         continue;
                     }
                     // get scheduled event
-                    SmppEvent smppEvent = smppEvents.poll(Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS);
+                    smppEvent = smppEvents.poll(Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS);
                     if (smppEvent == null) {
                         // timeout
                         continue;
@@ -332,8 +331,8 @@ public class SmppClientProcessor {
                     // dispatch to remote SMSC
                     dispatchEvent(smppEvent);
                     logger.trace("client.dispatch[{}]...", smppEvent.toString());
-                } catch (IOException ex) {
-                    logger.warn("Failed to dispatch smppEvent:{}", smppEvents.toString());
+                } catch (TimeoutException | PDUException | WrongSessionStateException | IOException | NotEnoughDataInByteBufferException | TerminatingZeroNotFoundException ex) {
+                    logger.warn("Failed to dispatch smppEvent:{}", smppEvent == null ? null : smppEvent.toString());
                     if (logger.isTraceEnabled()) {
                         logger.warn("Exception:", ex);
                     }
@@ -394,7 +393,7 @@ public class SmppClientProcessor {
             genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
             break;
         default:
-            logger.warn("Unknown McEvent...");
+            logger.warn("Unknown SmppEvent...");
             break;
         }
     }
@@ -614,7 +613,7 @@ public class SmppClientProcessor {
                 return;
             }
             try {
-                if (!serverEvents.offer(pduEvent, Constants.TIMEOUT_REQUEST_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
+                if (!serverEvents.offer(pduEvent, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
                     // warn the queue rejects the event
                     logger.warn("Failed to offer serverPDUEvent:{}", pduEvent.getPDU().debugString());
                 }

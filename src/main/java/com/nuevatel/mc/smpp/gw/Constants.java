@@ -18,7 +18,7 @@ public final class Constants {
      */
     public static final long TIMEOUT_POLL_EVENT_QUEUE = 500L;
     
-    public static final long TIMEOUT_REQUEST_EVENT_QUEUE = 500L;
+    public static final long TIMEOUT_OFFER_EVENT_QUEUE = 500L;
     
     /**
      * ESM_CLASS message mode mask (1-0)
@@ -32,6 +32,22 @@ public final class Constants {
      * ESM_CLASS GSM network specific features (7-6)
      */
     public static final int SM_GSM_MASK = 0Xc0;
+    
+    /**
+     * For SmppClientProcessor/SmppServerProcessor indicates the SmppEvent is not allowed to dispatch.
+     */
+    public static final int DISPATCH_EV_SOURCE_NOT_ALLOWED = 1;
+    
+    /**
+     * For SmppClientProcessor/SmppServerProcessor indicates the SmppEvent was scheduled to dispatch.
+     */
+    public static final int DISPATCH_EV_OK = 0;
+    
+    /**
+     * TP-Message-Reference
+     */
+    public static final byte TP_DFLT_MR = 0;
+    public static final byte TP_DFLT_PI = 0;
     
     private Constants() {
         // no op. prevent instantiation.

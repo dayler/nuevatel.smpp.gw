@@ -8,7 +8,9 @@ package com.nuevatel.mc.smpp.gw.dialog;
  *
  */
 public enum DialogType {
-    submitSm,
-    deliverSm,
+    esme_submit,
+    esme_deliver,
+    smsc_submit,
+    smsc_deliver,
     ;
 }

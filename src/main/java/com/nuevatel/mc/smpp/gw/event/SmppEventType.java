@@ -17,5 +17,7 @@ public enum SmppEventType {
     QuerySmEvent,
     DefaultResponseEvent,
     GenericNAckEvent,
+    //
+    DeliverSmEvent,
     ;
 }

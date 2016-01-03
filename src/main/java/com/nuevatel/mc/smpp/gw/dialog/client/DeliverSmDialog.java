@@ -127,7 +127,7 @@ public class DeliverSmDialog extends Dialog {
             ForwardSmICall fwsmiCall = new ForwardSmICall(// smppServiceType,
                                                           gwProcessor.getSmppGwSession().getSystemType(),
                                                           // smppScheduleDeliveryTime,
-                                                          StringUtils.isEmptyOrNull(deliverPdu.getScheduleDeliveryTime()) ? null : SmppDateUtil.parseDateTime(ZonedDateTime.now(), deliverPdu.getScheduleDeliveryTime()),
+                                                          StringUtils.isEmptyOrNull(deliverPdu.getScheduleDeliveryTime()) ? null : SmppDateUtil.parseDateTime(ZonedDateTime.now(ZoneId.systemDefault()), deliverPdu.getScheduleDeliveryTime()),
                                                           // smppReplaceIfPresentFlag
                                                           deliverPdu.getReplaceIfPresentFlag(),
                                                           // smppGwId

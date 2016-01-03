@@ -259,6 +259,12 @@ public class SmppServerProcessor {
         deliverSm.setRegisteredDelivery(event.getRegisteredDelivery());
         // Always assign sequence number
         deliverSm.assignSequenceNumber();
+        // optional param, receiped message id
+        if (!StringUtils.isEmptyOrNull(deliverSm.getReceiptedMessageId())) {
+            deliverSm.setReceiptedMessageId(event.getReceiptedMessageId());
+        }
+        // set command status
+        deliverSm.setCommandStatus(event.getCommandStatus());
         // send pdu
         transmitter.send(deliverSm);
     }

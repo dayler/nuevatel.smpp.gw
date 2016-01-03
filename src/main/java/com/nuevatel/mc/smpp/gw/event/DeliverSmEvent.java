@@ -26,6 +26,10 @@ public class DeliverSmEvent extends SmppEvent {
     
     private byte protocolId = Data.DFLT_PROTOCOLID;
     
+    private String receiptedMessageId = "";
+    
+    private int commandStatus = Data.ESME_ROK;
+    
     public DeliverSmEvent(long messageId) {
         setMessageId(messageId);
     }
@@ -84,6 +88,22 @@ public class DeliverSmEvent extends SmppEvent {
     
     public void setProtocolId(byte protocolId) {
         this.protocolId = protocolId;
+    }
+    
+    public void setReceiptedMessageId(String receiptedMessageId) {
+        this.receiptedMessageId = receiptedMessageId;
+    }
+    
+    public String getReceiptedMessageId() {
+        return receiptedMessageId;
+    }
+    
+    public void setCommandStatus(int commandStatus) {
+        this.commandStatus = commandStatus;
+    }
+    
+    public int getCommandStatus() {
+        return commandStatus;
     }
     
     /**

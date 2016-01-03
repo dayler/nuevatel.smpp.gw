@@ -24,6 +24,10 @@ public class DefaultResponseOKEvent extends SmppEvent {
         return resp;
     }
     
+    public Response getResponse() {
+        return resp;
+    }
+    
     @Override
     public SmppEventType type() {
         return SmppEventType.DefaultResponseEvent;

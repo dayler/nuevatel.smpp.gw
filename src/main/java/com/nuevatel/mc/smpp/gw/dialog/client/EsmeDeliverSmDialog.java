@@ -3,7 +3,6 @@
  */
 package com.nuevatel.mc.smpp.gw.dialog.client;
 
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -35,8 +34,8 @@ import com.nuevatel.mc.smpp.gw.util.EsmClass;
 import com.nuevatel.mc.smpp.gw.util.TpDcsUtils;
 import com.nuevatel.mc.smpp.gw.util.TpStatusResolver;
 import com.nuevatel.mc.smpp.gw.util.TpUdUtils;
-import com.nuevatel.mc.tpdu.SmsDeliver;
 import com.nuevatel.mc.tpdu.SmsStatusReport;
+import com.nuevatel.mc.tpdu.SmsSubmit;
 import com.nuevatel.mc.tpdu.TpAddress;
 import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.TpUd;
@@ -85,12 +84,13 @@ public class EsmeDeliverSmDialog extends Dialog {
      */
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
-        if (ev.getPDU() instanceof DeliverSM) {
+        if (!(ev.getPDU() instanceof DeliverSM)) {
             logger.warn("No DeliverSM instance({})", ev.getPDU().getClass().getName());
             return;
         }
         
         try {
+            ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
             state = DialogState.forward;
             deliverPdu = (DeliverSM) ev.getPDU();
             // do received ok response to remote smsc
@@ -103,30 +103,33 @@ public class EsmeDeliverSmDialog extends Dialog {
                                  tpDcs, // tpDcs
                                  TpUdUtils.resolveTpUdl(tpDcs.getCharSet(), deliverPdu.getShortMessageData().getBuffer()), // tpUdl
                                  deliverPdu.getShortMessageData().getBuffer()); // tpUd
-            SmsDeliver smsDeliver = new SmsDeliver(// tpMms
-                                                   false,
-                                                   // tpRp
-                                                   (deliverPdu.getEsmClass() & Data.SM_REPLY_PATH_GSM) == Data.SM_REPLY_PATH_GSM,
-                                                   // tpUdhi
-                                                   (deliverPdu.getEsmClass() & Data.SM_UDH_GSM) == Data.SM_UDH_GSM,
-                                                   // tpSri
-                                                   registeredDelivery,
-                                                   //tpOa,
-                                                   new TpAddress(deliverPdu.getSourceAddr().getTon(), deliverPdu.getSourceAddr().getNpi(), deliverPdu.getSourceAddr().getAddress()),
-                                                   // tpPid
-                                                   deliverPdu.getProtocolId(),
-                                                   // tpDcs
-                                                   tpDcs,
-                                                   // tpScts TP-Service-Centre-Time-Stamp
-                                                   LocalDateTime.now(ZoneId.systemDefault()),
-                                                   // tpUdl,
-                                                   tpud.getTpUdl(),
-                                                   // tpUd
-                                                   tpud.getTpUd());
+            SmsSubmit smsSubmit = new SmsSubmit(// tpRd
+                                                true,
+                                                // tpRp
+                                                (deliverPdu.getEsmClass() & Data.SM_REPLY_PATH_GSM) == Data.SM_REPLY_PATH_GSM,
+                                                // tpUdhi
+                                                (deliverPdu.getEsmClass() & Data.SM_UDH_GSM) == Data.SM_UDH_GSM,
+                                                // tpSrr
+                                                registeredDelivery,
+                                                // tpMr
+                                                (byte)0x0,
+                                                // tpDa
+                                                new TpAddress(deliverPdu.getDestAddr().getTon(), deliverPdu.getDestAddr().getNpi(), deliverPdu.getDestAddr().getAddress()),
+                                                // tpPid
+                                                deliverPdu.getProtocolId(),
+                                                // tpDcs
+                                                tpDcs,
+                                                // tpVp
+                                                SmppDateUtil.parseDateTime(now, deliverPdu.getValidityPeriod()).toLocalDateTime(),
+                                                // tpUdl
+                                                tpud.getTpUdl(),
+                                                // tpud
+                                                tpud.getTpUd());
             // ForwardSmICall to notify the MC, new message has arrived
             ForwardSmICall fwsmiCall = new ForwardSmICall(// smppServiceType,
                                                           gwProcessor.getSmppGwSession().getSystemType(),
                                                           // smppScheduleDeliveryTime,
+                                                          // TODO
                                                           StringUtils.isEmptyOrNull(deliverPdu.getScheduleDeliveryTime()) ? null : SmppDateUtil.parseDateTime(ZonedDateTime.now(ZoneId.systemDefault()), deliverPdu.getScheduleDeliveryTime()),
                                                           // smppReplaceIfPresentFlag
                                                           deliverPdu.getReplaceIfPresentFlag(),
@@ -137,7 +140,7 @@ public class EsmeDeliverSmDialog extends Dialog {
                                                           // fromName
                                                           new Name(deliverPdu.getSourceAddr().getAddress(), (byte)(deliverPdu.getSourceAddr().getTon() | deliverPdu.getSourceAddr().getNpi())),
                                                           // tpdu
-                                                          smsDeliver.getTpdu());
+                                                          smsSubmit.getTpdu());
             // dispatch sync message
             Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
             if (ret == null) {
@@ -149,6 +152,7 @@ public class EsmeDeliverSmDialog extends Dialog {
             ForwardSmIRet fwsmiRet = new ForwardSmIRet(ret);
             if (AppMessages.FAILED == fwsmiRet.getRet()) {
                 // failed
+                state = DialogState.failed;
                 commandStatusCode = Data.ESME_RSYSERR;
                 invalidate();
                 return;
@@ -216,6 +220,7 @@ public class EsmeDeliverSmDialog extends Dialog {
         } else {
             // No in close estate means an error occurred in the work flow.
             gwProcessor.offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));
+            return;
         }
         // only if delivery status is required
         if (registeredDelivery) {

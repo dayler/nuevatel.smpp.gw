@@ -42,6 +42,10 @@ public final class TpDcsUtils {
      * @return <code>TpDcs</code> to corresponds with smppEncoding.
      */
     public static TpDcs resolveTpDcs(String smppEncoding) {
+        if (StringUtils.isEmptyOrNull(smppEncoding)) {
+            return new TpDcs(TpDcs.CS_GSM7);
+        }
+        
         switch (smppEncoding) {
         case Constants.CS_GSM7:
             return new TpDcs(TpDcs.CS_GSM7);

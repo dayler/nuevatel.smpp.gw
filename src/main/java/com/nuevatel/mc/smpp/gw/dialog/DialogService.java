@@ -15,6 +15,7 @@ import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
 import com.nuevatel.common.cache.RemovalListener;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.exception.NoDialogCachedObject;
 
 /**
@@ -34,9 +35,11 @@ public class DialogService {
     
     private ExecutorService taskService;
     
+    private Config cfg = AllocatorService.getConfig();
+    
     public DialogService() {
+        taskService = Executors.newFixedThreadPool(cfg.getDialogCacheTaskConcurrencyLevel());
         resolveLoadingCache();
-        taskService = Executors.newFixedThreadPool(AllocatorService.getConfig().getDialogCacheTaskConcurrencyLevel());
     }
     
     public Long findDialogIdBySequenceNumber(int seqNumber) {
@@ -101,8 +104,6 @@ public class DialogService {
     public void invalidate(Dialog dialog) {
         dialogCache.invalidate(dialog.getDialogId());
         smppMsgToDialogMap.remove(dialog.getCurrentSequenceNumber());
-        // execute 
-        taskService.execute(()->dialog.execute());
     }
     
     /**

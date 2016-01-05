@@ -12,9 +12,7 @@ import org.apache.logging.log4j.Logger;
 import org.smpp.Data;
 import org.smpp.ServerPDUEvent;
 import org.smpp.pdu.Address;
-import org.smpp.pdu.DeliverSMResp;
 import org.smpp.pdu.PDU;
-import org.smpp.pdu.Response;
 import org.smpp.pdu.SubmitSM;
 import org.smpp.pdu.SubmitSMResp;
 
@@ -90,7 +88,6 @@ public class SubmitSmDialog extends Dialog {
                 handleSubmitSm((SubmitSM) pdu);
             } else if (pdu.isResponse() && pdu.isOk() && pdu.getCommandId() == Data.DELIVER_SM_RESP) {
                 // deliverSm resp
-                state = DialogState.forward;
                 // no ret
                 handleDeliverSmResp(pdu);
             } else {
@@ -167,7 +164,7 @@ public class SubmitSmDialog extends Dialog {
     public void handleMcMessage(Message msg) {
         if (msg == null || msg.getCode() != McMessage.FORWARD_SM_O_CALL) {
             // log warning
-            logger.warn("Message is null or not FORWARD_SM_O_CALL...");
+            logger.warn("Message is null or not FORWARD_SM_O_CALL code:{}...", msg == null ? null : msg.getCode());
         }
         try {
             // create fwsmo call
@@ -186,8 +183,14 @@ public class SubmitSmDialog extends Dialog {
             // tpSt to smpp command status
             int smppStatus = TpStatusResolver.resolveSmppCommandStatus(smsSr.getTpSt());
             deliverSmEv.setCommandStatus(smppStatus);
+            // dispatch deliver_sm confirmation
+            gwProcessor.offerSmppEvent(deliverSmEv);
+            state = DialogState.awaiting_0;
         } catch (Throwable ex) {
-            // TODO: handle exception
+            logger.warn("Failed to handle McMessage...", ex);
+            state = DialogState.failed;
+            commandStatusCode = Data.ESME_RSYSERR;
+            invalidate();
         }
     }
 

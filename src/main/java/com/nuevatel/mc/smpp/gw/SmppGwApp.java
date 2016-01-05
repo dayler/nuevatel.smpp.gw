@@ -50,7 +50,6 @@ public class SmppGwApp extends GenericApp {
     private SmppGwApp() {
         super();
         setAppType(APP_TYPE.SMPP_GW);
-        mgmtAppList = null;
     }
     
     @Override
@@ -81,7 +80,7 @@ public class SmppGwApp extends GenericApp {
                                               .forEach((proxyApp) -> proxyApp.getAppClient().start());
             // updateState
             setState(STATE.ONLINE);
-            BaseApp mgmtApp = mgmtApp();
+            BaseApp mgmtApp = getMgmt().getApp();
             if (mgmtApp != null) {
                 callUpdateState(mgmtApp.getWsURL(), getAppId(), getAppId(), getState());
             }
@@ -108,14 +107,6 @@ public class SmppGwApp extends GenericApp {
     @Override
     protected byte updateState(int fromAppId, int appId, STATE state) {
         if (fromAppId != getAppId()) {
-            // mgmt
-            for (BaseApp mgmtApp : mgmtAppList) {
-                if (mgmtApp.getAppId() == appId && mgmtApp.getState() != state) {
-                    mgmtApp.setState(state);
-                    logger.log(state == STATE.OFFLINE ? Level.WARN : Level.INFO, "appId " + mgmtApp.getAppId() + " state " + state.getName());
-                    return WsConn.ACCEPTED;
-                }
-            }
             // proxy
             BaseApp proxyApp = remoteBaseAppMap.get(appId);
             if (proxyApp != null && proxyApp.getState() != state) {
@@ -170,7 +161,7 @@ public class SmppGwApp extends GenericApp {
      * @param bound
      */
     public void setBound(int smppGwId, int smppSessionId, int bound) {
-        WsClient wsClient = new WsClient(mgmtApp().getWsURL());
+        WsClient wsClient = new WsClient(getMgmt().getApp().getWsURL());
         try {
             wsClient.call(GenericApp.WS_METHOD.SET_BOUND.getName(),
                           TIMEOUT,
@@ -191,7 +182,7 @@ public class SmppGwApp extends GenericApp {
      */
     private void setProperties() {
         // mgmtApp
-        BaseApp mgmtApp = mgmtApp();
+        BaseApp mgmtApp = getMgmt().getApp();
         if (mgmtApp == null) throw new RuntimeException("null mgmtApp");
 
         WsClient wsClient = new WsClient(mgmtApp.getWsURL());

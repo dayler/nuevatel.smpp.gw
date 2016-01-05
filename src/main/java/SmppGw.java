@@ -1,14 +1,12 @@
 
 import com.nuevatel.mc.common.BaseApp;
 import com.nuevatel.mc.common.GenericApp;
+import com.nuevatel.mc.common.RedundantApp;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 
 import java.io.FileReader;
-import java.io.IOException;
 import java.io.Reader;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 
 import org.apache.logging.log4j.LogManager;
@@ -29,9 +27,9 @@ public class SmppGw {
 
     /* constants for properties */
     public static final String APP_ID = "appId";
-    public static final String MGMT_APP_PROPERTIES_LIST = "mgmtAppPropertiesList";
     /* constants for mgmt properties */
-    public static final String WS_URL = "wsURL";
+    public static final String MGMT_ID = "mgmtId";
+    public static final String MGMT_WS_URL = "mgmtWsURL";
 
     /**
      * to shutdown kill -15 pid
@@ -68,48 +66,31 @@ public class SmppGw {
                 } catch (NumberFormatException nfe) {
                     throw new RuntimeException("illegal " + APP_ID + " " + properties.getProperty(APP_ID), nfe);
                 }
-
-                // mgmtAppList
-                List<BaseApp> mgmtAppList = new ArrayList<>();
-                // mgmtAppPropertiesList
-                String mgmtAppPropertiesList = properties.getProperty(MGMT_APP_PROPERTIES_LIST);
-                String[] filenameArray = mgmtAppPropertiesList.split("\\s");
-                for (String filename : filenameArray) {
-                    Properties mgmtAppProperties = new Properties();
-                    try (Reader mgmtAppPropertiesReader = new FileReader(filename)) {
-                        mgmtAppProperties.load(mgmtAppPropertiesReader);
-                    } catch (IOException | IllegalArgumentException e) {
-                        throw e;
-                    }
-                    // mgmtAppId
-                    int mgmtAppId;
-                    try {
-                        mgmtAppId = Integer.parseInt(mgmtAppProperties.getProperty(APP_ID));
-                    } catch (NumberFormatException nfe) {
-                        throw new RuntimeException("illegal " + APP_ID + " " + mgmtAppProperties.getProperty(APP_ID), nfe);
-                    }
-                    // wsURL
-                    String wsURL = mgmtAppProperties.getProperty(WS_URL);
-                    if (wsURL == null) {
-                        throw new RuntimeException("illegal " + WS_URL + " " + mgmtAppProperties.getProperty(WS_URL));
-                    }
-                    // state
-                    BaseApp.STATE state = GenericApp.callGetState(wsURL);
-                    mgmtAppList.add(new BaseApp(mgmtAppId, BaseApp.APP_TYPE.MGMT, state, wsURL));
+                // mgmtAppId
+                int mgmtId;
+                try {
+                    mgmtId = Integer.parseInt(properties.getProperty(MGMT_ID));
+                } catch (NumberFormatException nfe) {
+                    throw new RuntimeException("illegal " + APP_ID + " " + properties.getProperty(APP_ID), nfe);
                 }
-                if (mgmtAppList.isEmpty()) {
-                    throw new RuntimeException("illegal " + MGMT_APP_PROPERTIES_LIST);
+                // wsURL
+                String mgmtWsURL = properties.getProperty(MGMT_WS_URL);
+                if (mgmtWsURL == null) {
+                    throw new RuntimeException("illegal " + MGMT_WS_URL + " " + properties.getProperty(MGMT_WS_URL));
                 }
-
-                // smppGwApp
+                // mgmtApp
+                RedundantApp<BaseApp>mgmtApp = GenericApp.callGetMgmt(mgmtWsURL, mgmtId);
+                if (mgmtApp == null) {
+                    throw new RuntimeException("illegal " + MGMT_ID + " " + properties.getProperty(MGMT_ID));
+                }
                 SmppGwApp smppGwApp = SmppGwApp.getSmppGwApp();
                 smppGwApp.setAppId(appId);
-                smppGwApp.setMgmtAppList(mgmtAppList);
+                smppGwApp.setMgmt(mgmtApp);
 
                 // start
                 smppGwApp.start();
                 // Add shutdown hook
-                Runtime.getRuntime().addShutdownHook(new Thread(()->smppGwApp.interrupt()));
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> smppGwApp.interrupt()));
             } catch (Throwable e) {
                 logger.error(e.getMessage(), e);
                 System.exit(-1);

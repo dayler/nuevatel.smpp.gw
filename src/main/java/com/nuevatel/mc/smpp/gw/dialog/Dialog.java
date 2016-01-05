@@ -6,7 +6,7 @@ package com.nuevatel.mc.smpp.gw.dialog;
 import org.smpp.Data;
 import org.smpp.ServerPDUEvent;
 
-import com.nuevatel.common.appconn.Message;
+import com.nuevatel.mc.appconn.McMessage;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.mcdispatcher.McDispatcher;
 
@@ -48,7 +48,7 @@ public abstract class Dialog {
     
     public abstract void handleSmppEvent(ServerPDUEvent ev);
     
-    public abstract void handleMcMessage(Message msg);
+    public abstract void handleMcMessage(McMessage msg);
     
     public abstract void execute();
     

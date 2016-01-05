@@ -19,6 +19,7 @@ import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.mc.appconn.ForwardSmICall;
 import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
+import com.nuevatel.mc.appconn.McMessage;
 import com.nuevatel.mc.appconn.Name;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
@@ -48,9 +49,9 @@ import com.nuevatel.mc.tpdu.Tpdu;
  * @author Ariel Salazar
  *
  */
-public class SubmitSmDialog extends Dialog {
+public class EsmeSubmitSmDialog extends Dialog {
     
-    private static Logger logger= LogManager.getLogger(SubmitSmDialog.class);
+    private static Logger logger= LogManager.getLogger(EsmeSubmitSmDialog.class);
     
     private SmppGwProcessor gwProcessor;
     
@@ -69,7 +70,7 @@ public class SubmitSmDialog extends Dialog {
     
     private byte tpStatus = Tpdu.TP_ST_PERMANENT_ERROR;
 
-    public SubmitSmDialog(long messageId,
+    public EsmeSubmitSmDialog(long messageId,
                           int processorId, // smppGwId
                           long smMessageId,
                           byte registeredDelivery,
@@ -207,7 +208,7 @@ public class SubmitSmDialog extends Dialog {
     }
 
     @Override
-    public void handleMcMessage(Message msg) {
+    public void handleMcMessage(McMessage msg) {
         // No op
     }
 

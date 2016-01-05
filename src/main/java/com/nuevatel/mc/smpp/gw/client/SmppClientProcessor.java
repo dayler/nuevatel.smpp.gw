@@ -13,7 +13,7 @@ import com.nuevatel.mc.smpp.gw.McMessageId;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
-import com.nuevatel.mc.smpp.gw.dialog.client.DeliverSmDialog;
+import com.nuevatel.mc.smpp.gw.dialog.client.EsmeDeliverSmDialog;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.CancelSmEvent;
 import com.nuevatel.mc.smpp.gw.event.DataSmEvent;
@@ -241,7 +241,7 @@ public class SmppClientProcessor {
                                 // TODO
                                 System.out.println("******* " + pdu.debugString() + " time " + ZonedDateTime.now().toString());
                                 // SmppSessionId is the processor identifier.
-                                Dialog deliverSmDialog = new DeliverSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
+                                Dialog deliverSmDialog = new EsmeDeliverSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
                                                                             gwSession.getSmppSessionId()); // Id to identify the processor
                                 // Register and init new dialog
                                 ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());

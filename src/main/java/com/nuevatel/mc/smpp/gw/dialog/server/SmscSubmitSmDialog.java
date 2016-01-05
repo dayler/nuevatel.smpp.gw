@@ -43,9 +43,9 @@ import com.nuevatel.mc.tpdu.TpAddress;
  * @author Ariel Salazar
  *
  */
-public class SubmitSmDialog extends Dialog {
+public class SmscSubmitSmDialog extends Dialog {
     
-    private static Logger logger = LogManager.getLogger(SubmitSmDialog.class);
+    private static Logger logger = LogManager.getLogger(SmscSubmitSmDialog.class);
     
     private SubmitSM submitSm = null;
     
@@ -57,7 +57,7 @@ public class SubmitSmDialog extends Dialog {
 
     private String msgId = "";
 
-    public SubmitSmDialog(long dialogId, int processorId) {
+    public SmscSubmitSmDialog(long dialogId, int processorId) {
         super(dialogId, processorId);
         Parameters.checkNull(submitSm, "submitSm");
         // select processor
@@ -161,14 +161,10 @@ public class SubmitSmDialog extends Dialog {
      * {@inheritDoc}
      */
     @Override
-    public void handleMcMessage(Message msg) {
-        if (msg == null || msg.getCode() != McMessage.FORWARD_SM_O_CALL) {
-            // log warning
-            logger.warn("Message is null or not FORWARD_SM_O_CALL code:{}...", msg == null ? null : msg.getCode());
-        }
+    public void handleMcMessage(McMessage msg) {
         try {
             // create fwsmo call
-            ForwardSmOCall fwsmoCall = new ForwardSmOCall(msg);
+            ForwardSmOCall fwsmoCall = (ForwardSmOCall) msg;
             // get smsStatusRep
             SmsStatusReport smsSr = new SmsStatusReport(fwsmoCall.getTpdu());
             EsmClass esmClass = new EsmClass(true, smsSr.getTpUdhi(), false);

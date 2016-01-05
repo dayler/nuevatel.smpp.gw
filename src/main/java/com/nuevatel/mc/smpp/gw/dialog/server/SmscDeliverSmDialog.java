@@ -20,6 +20,7 @@ import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.mc.appconn.ForwardSmICall;
 import com.nuevatel.mc.appconn.ForwardSmORetAsyncCall;
+import com.nuevatel.mc.appconn.McMessage;
 import com.nuevatel.mc.appconn.Name;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
@@ -42,9 +43,9 @@ import com.nuevatel.mc.tpdu.Tpdu;
  * @author Ariel Salazar
  *
  */
-public class DeliverSmDialog extends Dialog {
+public class SmscDeliverSmDialog extends Dialog {
     
-    private static Logger logger = LogManager.getLogger(DeliverSmDialog.class);
+    private static Logger logger = LogManager.getLogger(SmscDeliverSmDialog.class);
     
     private SmppGwProcessor gwProcessor;
     
@@ -62,7 +63,7 @@ public class DeliverSmDialog extends Dialog {
     
     private byte tpStatus = Tpdu.TP_ST_PERMANENT_ERROR;
     
-    public DeliverSmDialog(long dialogId,
+    public SmscDeliverSmDialog(long dialogId,
                            int processorId,
                            long smMessageId,
                            Name fromName,
@@ -162,7 +163,7 @@ public class DeliverSmDialog extends Dialog {
      * {@inheritDoc}
      */
     @Override
-    public void handleMcMessage(Message msg) {
+    public void handleMcMessage(McMessage msg) {
         // no op
     }
     

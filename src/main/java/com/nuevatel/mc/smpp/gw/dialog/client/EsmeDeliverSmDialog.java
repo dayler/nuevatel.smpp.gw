@@ -56,9 +56,9 @@ import com.nuevatel.mc.tpdu.TpUd;
  * @author Ariel Salazar
  *
  */
-public class DeliverSmDialog extends Dialog {
+public class EsmeDeliverSmDialog extends Dialog {
     
-    private static Logger logger = LogManager.getLogger(DeliverSmDialog.class);
+    private static Logger logger = LogManager.getLogger(EsmeDeliverSmDialog.class);
     
     private SmppGwProcessor gwProcessor;
     
@@ -66,7 +66,7 @@ public class DeliverSmDialog extends Dialog {
     
     private DeliverSM deliverPdu = null;
     
-    public DeliverSmDialog(long messageId, int processorId) {
+    public EsmeDeliverSmDialog(long messageId, int processorId) {
         super(messageId, processorId);
         // select processor
         gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
@@ -174,15 +174,11 @@ public class DeliverSmDialog extends Dialog {
     }
 
     @Override
-    public void handleMcMessage(Message msg) {
+    public void handleMcMessage(McMessage msg) {
         Parameters.checkNull(msg, "msg");
         try {
-            if (McMessage.FORWARD_SM_O_CALL != msg.getCode()) {
-                // ignore message
-                return;
-            }
             state = DialogState.forward;
-            ForwardSmOCall fwsmoCall = new ForwardSmOCall(msg);
+            ForwardSmOCall fwsmoCall = (ForwardSmOCall) msg;
             SmsStatusReport smsSr = new SmsStatusReport(fwsmoCall.getTpdu());
             commandStatusCode = TpStatusResolver.resolveSmppCommandStatus(smsSr.getTpSt());
             if (Data.ESME_ROK == commandStatusCode) {

@@ -37,7 +37,7 @@ import com.nuevatel.mc.smpp.gw.McMessageId;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
-import com.nuevatel.mc.smpp.gw.dialog.server.SubmitSmDialog;
+import com.nuevatel.mc.smpp.gw.dialog.server.SmscSubmitSmDialog;
 import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
@@ -139,7 +139,7 @@ public class SmppServerProcessor {
                         // Create new Dialog
                         if (pdu.isRequest() && Data.SUBMIT_SM == pdu.getCommandId()) {
                             // SmppSessionId is the processor identifier.
-                            Dialog submitDialog = new SubmitSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
+                            Dialog submitDialog = new SmscSubmitSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
                                                                      gwSession.getSmppSessionId()); // Id to identify the processor
                             // Register and init new dialog
                             ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
@@ -189,6 +189,13 @@ public class SmppServerProcessor {
     public void shutdown() {
         receiver.stop();
         receiving = false;
+        try {
+            if (conn.isOpened()) {
+                conn.close();
+            }
+        } catch (IOException ex) {
+            logger.warn("smppGwId{}: Failed to close connection....", gwSession.getSmppGwId());
+        }
     }
     
     /**

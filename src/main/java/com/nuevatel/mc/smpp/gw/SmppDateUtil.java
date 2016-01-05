@@ -76,6 +76,6 @@ public final class SmppDateUtil {
                                 Integer.parseInt(strDateTime.substring(8, 10)), 
                                 Integer.parseInt(strDateTime.substring(10, 12)), 
                                 0,
-                                ZoneId.of("UTC"));
+                                ZoneId.systemDefault());
     }
 }

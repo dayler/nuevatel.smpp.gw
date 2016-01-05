@@ -8,6 +8,8 @@ package com.nuevatel.mc.smpp.gw.server;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,7 +29,7 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
     
     private static Logger logger = LogManager.getLogger(SmppServerGwProcessor.class);
     
-    private List<SmppServerProcessor>smppServerProcessor = new ArrayList<>();
+    private List<SmppServerProcessor>smppServerProcessorList = new ArrayList<>();
     
     private Config cfg = AllocatorService.getConfig();
     
@@ -35,8 +37,12 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
     
     private Connection serverConn = null;
     
+    private ExecutorService service;
+    
     public SmppServerGwProcessor(SmppGwSession gwSession) {
         super(gwSession);
+        // Number of binds to attends
+        service = Executors.newFixedThreadPool(gwSession.getMaxBinds());
     }
     
     /**
@@ -75,11 +81,23 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
         try {
             receiving = false;
             Connection conn = null;
-            serverConn.setReceiveTimeout(cfg.getServerListenerReceiveTimeout());
             conn = serverConn.accept();
             // if an connection is requested
             if (conn != null) {
-                // TODO Create smppServerProcessor
+                // Create smppServerProcessor
+                SmppServerProcessor processor = new SmppServerProcessor(gwSession, conn, serverPduEvents, smppEvents);
+                // register processor
+                smppServerProcessorList.add(processor);
+                // dispatch
+                service.execute(() -> processor.dispatch());
+                // receive
+                service.execute(() -> processor.receive());
+                // TODO health check
+            } else {
+                // timeout defined on setReceivingTimeout
+                if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
+                    logger.debug("On receive timeout. Awaithing by bew connections...");
+                }
             }
         } catch (IOException ex) {
             logger.error("Failed on receive...", ex);
@@ -89,6 +107,8 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
     @Override
     public void shutdown(int i) {
         try {
+            // stop processors
+            smppServerProcessorList.forEach(p -> p.shutdown());
             if (serverConn != null && serverConn.isOpened()) {
                 // Try to close server connection listener
                 serverConn.close();

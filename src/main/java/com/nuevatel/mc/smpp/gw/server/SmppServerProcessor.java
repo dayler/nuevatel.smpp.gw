@@ -40,6 +40,7 @@ import com.nuevatel.mc.smpp.gw.dialog.DialogService;
 import com.nuevatel.mc.smpp.gw.dialog.server.SubmitSmDialog;
 import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
+import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.DeliverSmEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.smpp.gw.event.SmppEvent;
@@ -76,12 +77,6 @@ public class SmppServerProcessor {
     private Transmitter transmitter;
     
     private McMessageId mcMsgId = new McMessageId();
-    
-    /**
-     * TODO
-     * Count inactivity period before to close connection, by inactivity.
-     */
-//    private int timeoutCntr = 0;
     
     private Config cfg = AllocatorService.getConfig();
     
@@ -123,7 +118,15 @@ public class SmppServerProcessor {
                     }
                     PDU pdu = smppEvent.getPDU();
                     if (pdu == null) {
+                        logger.warn("smppGwId:{}. Null pdu...", gwSession == null ? null : gwSession.getSmppGwId());
                         return;
+                    }
+                    // enquire link
+                    if (pdu.isRequest() && Data.ENQUIRE_LINK == pdu.getCommandId()) {
+                        // respond enquire link
+                        DefaultResponseOKEvent rok = new DefaultResponseOKEvent(pdu);
+                        offerSmppEvent(rok);
+                        continue;
                     }
                     // Find dialog to dispatch message, if it does not exists
                     // create new dialog.
@@ -134,13 +137,12 @@ public class SmppServerProcessor {
                         dialog.handleSmppEvent(smppEvent);
                     } else {
                         // Create new Dialog
-                        if (Data.SUBMIT_SM == pdu.getCommandId() && pdu.isRequest()) {
+                        if (pdu.isRequest() && Data.SUBMIT_SM == pdu.getCommandId()) {
                             // SmppSessionId is the processor identifier.
-                            // TODO
                             Dialog submitDialog = new SubmitSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
                                                                      gwSession.getSmppSessionId()); // Id to identify the processor
                             // Register and init new dialog
-                            ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
+                            ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
                             long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((SubmitSM) pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
                             dialogService.putDialog(submitDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : cfg.getDefaultValidityPeriod());
                             // Initialize dialog
@@ -158,7 +160,6 @@ public class SmppServerProcessor {
                             }
                         }
                     }
-                    // TODO logic to select dialogs
                 } catch (InterruptedException ex) {
                     logger.error("On recieving event, the processor:{} ...",
                             gwSession == null ? null : gwSession.getSmppGwId(), ex);

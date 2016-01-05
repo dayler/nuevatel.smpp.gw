@@ -244,7 +244,7 @@ public class SmppClientProcessor {
                                 Dialog deliverSmDialog = new DeliverSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
                                                                             gwSession.getSmppSessionId()); // Id to identify the processor
                                 // Register and init new dialog
-                                ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
+                                ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
                                 long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((DeliverSM)pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
                                 dialogService.putDialog(deliverSmDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : defaultValidityPeriod);
                                 // Initialize dialog

@@ -112,7 +112,7 @@ public class SubmitSmDialog extends Dialog {
             // serviceCentre timestamp
             event.setScheduleDeliveryTime(SmppDateUtil.toSmppDatetime(smsSubmit.getTpVp()));
             // use default validity period
-            ZonedDateTime validityPeriod = defaultValidityPeriod > 0 ? ZonedDateTime.now(ZoneId.of("UTC")).plus(defaultValidityPeriod, ChronoUnit.MILLIS) : ZonedDateTime.now(ZoneId.of("UTC"));
+            ZonedDateTime validityPeriod = defaultValidityPeriod > 0 ? ZonedDateTime.now(ZoneId.systemDefault()).plus(defaultValidityPeriod, ChronoUnit.MILLIS) : ZonedDateTime.now(ZoneId.of("UTC"));
             event.setValidityPeriod(SmppDateUtil.toSmppDatetime(validityPeriod));
             // esm_class
             // default message mode, default message type

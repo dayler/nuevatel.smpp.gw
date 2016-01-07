@@ -20,6 +20,8 @@ public abstract class Dialog {
     
     private int currentSequenceNumber = -1;
     
+    private String currentMsgId = null;
+    
     protected long dialogId;
     
     protected int processorId;
@@ -80,5 +82,13 @@ public abstract class Dialog {
     
     public DialogState getState() {
         return state;
+    }
+    
+    public String getCurrentMsgId() {
+        return currentMsgId;
+    }
+    
+    public void setCurrentMsgId(String currentMsgId) {
+        this.currentMsgId = currentMsgId;
     }
 }

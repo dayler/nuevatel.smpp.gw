@@ -230,9 +230,9 @@ public class SmppClientProcessor {
                     if (pdu != null) {
                         // Find dialog to dispatch message to handle it, if it does not exists create new dialog for incoming messages.
                         Dialog dialog = null;
-                        Long dialogId = dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
+                        Long dialogId = findDialogId(pdu);
                         if (dialogId != null && (dialog = dialogService.getDialog(dialogId)) != null) {
-                            // Handle event
+                            // Handle event by dialog
                             dialog.handleSmppEvent(smppEvent);
                         } else {
                             // Create dialog
@@ -270,6 +270,16 @@ public class SmppClientProcessor {
         } catch (Throwable ex) {
             logger.fatal("On recieving event, the processor:{} is stoping ...", gwSession == null ? null : gwSession.getSmppGwId(), ex);
         }
+    }
+    
+    private Long findDialogId(PDU pdu) throws ValueNotSetException {
+        if (pdu.isRequest() && Data.DELIVER_SM == pdu.getCommandId()) {
+            return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
+        } else if (pdu.isResponse()) {
+            return dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
+        }
+        
+        return null;
     }
     
     /**
@@ -485,6 +495,8 @@ public class SmppClientProcessor {
         request.setEsmClass(event.getEsmClass());
         request.setProtocolId(event.getProtocolId());
         request.setPriorityFlag(event.getPriorityFlag());
+        // set report delivery status
+        request.setRegisteredDelivery(event.getRegisteredDelivery());
         // Always assign sequence number
         assignSequenceNumber(request, event.getMessageId());
         // Asynchronous submit request, response is catch in the listener

@@ -1,5 +1,6 @@
 package com.nuevatel.mc.smpp.gw.domain;
 
+import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 
 /**
@@ -77,7 +78,7 @@ public class SmppGwSession {
         this.smscAddress = smscAddress;
         this.smscPort = smscPort;
         this.bindType = bindType;
-        this.systemId = systemId;
+        this.systemId = StringUtils.isEmptyOrNull(systemId) ? "" : systemId;
         this.password = password;
         this.systemType = systemType;
         this.rSourceAddrRegex = rSourceAddrRegex;

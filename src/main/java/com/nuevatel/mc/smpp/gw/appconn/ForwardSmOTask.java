@@ -67,14 +67,14 @@ public class ForwardSmOTask implements Task {
             // Create dialog if it does not exists
             SmppGwSession gwSession = SmppGwApp.getSmppGwApp().getSmppGwSession(fwsmoCall.getSmppSessionId());
             if (SmppGwSession.SMPP_TYPE.ESME.equals(gwSession.getSmppType())) {
-                // esme submit_sm TODO
+                // esme submit_sm 
                 SmsSubmit smsSubmit = new SmsSubmit(fwsmoCall.getTpdu(), now);
                 EsmeSubmitSmDialog esmeSubmitDialog = new EsmeSubmitSmDialog(// dialogId
                                                                              fwsmoCall.getMessageId(),
                                                                              // processorId
                                                                              fwsmoCall.getSmppSessionId(),
                                                                              // smMessageId
-                                                                             fwsmoCall.getSmMessageId(),
+                                                                             fwsmoCall.getSmMessageId() == null ? 0 : fwsmoCall.getSmMessageId(),
                                                                              // registeredDelivery
                                                                              fwsmoCall.getRegisteredDelivery(),
                                                                              // fromName

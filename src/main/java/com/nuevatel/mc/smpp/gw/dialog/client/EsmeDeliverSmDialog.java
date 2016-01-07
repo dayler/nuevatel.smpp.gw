@@ -76,6 +76,8 @@ public class EsmeDeliverSmDialog extends Dialog {
      */
     @Override
     public void init() {
+        // TODO debug string
+        System.out.println("init");
         state = DialogState.init;
     }
 
@@ -129,7 +131,6 @@ public class EsmeDeliverSmDialog extends Dialog {
             ForwardSmICall fwsmiCall = new ForwardSmICall(// smppServiceType,
                                                           gwProcessor.getSmppGwSession().getSystemType(),
                                                           // smppScheduleDeliveryTime,
-                                                          // TODO
                                                           StringUtils.isEmptyOrNull(deliverPdu.getScheduleDeliveryTime()) ? null : SmppDateUtil.parseDateTime(ZonedDateTime.now(ZoneId.systemDefault()), deliverPdu.getScheduleDeliveryTime()),
                                                           // smppReplaceIfPresentFlag
                                                           deliverPdu.getReplaceIfPresentFlag(),
@@ -158,7 +159,12 @@ public class EsmeDeliverSmDialog extends Dialog {
                 return;
             }
             
+         // TODO debug
+            System.out.println("dispatch fwsmiCall ok");
+            
             if (!registeredDelivery) {
+                // TODO debug 
+                System.out.println("registeredDelivery invalidate...");
                 // No await registered delivery
                 state = DialogState.close;
                 invalidate();
@@ -183,6 +189,10 @@ public class EsmeDeliverSmDialog extends Dialog {
         try {
             state = DialogState.forward;
             ForwardSmOCall fwsmoCall = (ForwardSmOCall) msg;
+            
+            // TODO
+            System.out.println("receive deliver notif");
+            
             SmsStatusReport smsSr = new SmsStatusReport(fwsmoCall.getTpdu());
             commandStatusCode = TpStatusResolver.resolveSmppCommandStatus(smsSr.getTpSt());
             if (Data.ESME_ROK == commandStatusCode) {
@@ -212,6 +222,8 @@ public class EsmeDeliverSmDialog extends Dialog {
 
     @Override
     public void execute() {
+        // TODO
+        System.err.println("execute delivery");
         // serviceMessage = smpp commandStatus
         if (DialogState.close.equals(state) && commandStatusCode == Data.ESME_ROK) {
             // deliver ROK sm response, message delivered.
@@ -224,6 +236,8 @@ public class EsmeDeliverSmDialog extends Dialog {
         }
         // only if delivery status is required
         if (registeredDelivery) {
+            // TODO
+            System.err.println("execute delivery");
             if (DialogState.close.equals(state) && Data.ESME_ROK == commandStatusCode) {
                 // notify ok
                 ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);

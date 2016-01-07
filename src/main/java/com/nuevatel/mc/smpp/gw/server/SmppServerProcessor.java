@@ -21,10 +21,14 @@ import org.smpp.Data;
 import org.smpp.Receiver;
 import org.smpp.ServerPDUEvent;
 import org.smpp.Transmitter;
+import org.smpp.pdu.BindRequest;
+import org.smpp.pdu.BindResponse;
 import org.smpp.pdu.DeliverSM;
 import org.smpp.pdu.PDU;
 import org.smpp.pdu.PDUException;
+import org.smpp.pdu.Request;
 import org.smpp.pdu.SubmitSM;
+import org.smpp.pdu.WrongLengthOfStringException;
 import org.smpp.util.ByteBuffer;
 import org.smpp.util.NotEnoughDataInByteBufferException;
 import org.smpp.util.TerminatingZeroNotFoundException;
@@ -43,6 +47,7 @@ import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.DeliverSmEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
+import com.nuevatel.mc.smpp.gw.event.GenericResponseEvent;
 import com.nuevatel.mc.smpp.gw.event.SmppEvent;
 
 /**
@@ -80,6 +85,8 @@ public class SmppServerProcessor {
     
     private Config cfg = AllocatorService.getConfig();
     
+    private boolean bound = false;
+
     public SmppServerProcessor(SmppGwSession gwSession,
                                Connection conn,
                                BlockingQueue<ServerPDUEvent> serverPduEvents,
@@ -97,6 +104,64 @@ public class SmppServerProcessor {
         receiver = new Receiver(transmitter, conn);
         // set handler
         receiver.setServerPDUEventListener((event)->handleServerPduEvent(event));
+    }
+    
+    public boolean isBound() {
+        return bound;
+    }
+    
+    private int checkIdentity(BindRequest request) {
+        // user = system id
+        if (!gwSession.getSystemId().equals(request.getSystemId())) {
+            logger.info("Invalid system id BindRequest:{}", request.debugString());
+            return Data.ESME_RINVSYSID;
+        }
+        
+        if (!gwSession.getPassword().equals(request.getPassword())) {
+            logger.info("Invalid password BindRequest:{}", request.debugString());
+            return Data.ESME_RINVPASWD;
+        }
+        
+        logger.info("authenticated for system id:{} BindRequest:{}", request.getSystemId(), request.debugString());
+        return Data.ESME_ROK;
+    }
+    
+    private void handleBindRequest(Request request) throws WrongLengthOfStringException, InterruptedException {
+        int commandId = request.getCommandId();
+        if (Data.BIND_TRANSMITTER == commandId
+            || Data.BIND_RECEIVER == commandId
+            || Data.BIND_TRANSCEIVER == commandId) {
+            // do bind
+            int cmdSt = checkIdentity((BindRequest) request);
+            if (Data.ESME_ROK == cmdSt) {
+                // Successful
+                BindResponse bindResponse = (BindResponse) request.getResponse();
+                bindResponse.setSystemId(gwSession.getSystemId());
+                GenericResponseEvent gresp = new GenericResponseEvent(bindResponse);
+                offerSmppEvent(gresp);
+                // enable bound
+                bound = true;
+            } else {
+                // failed to authenticated
+                GenericResponseEvent nackRespEv = new GenericResponseEvent(request.getResponse(), cmdSt);
+                offerSmppEvent(nackRespEv);
+                bound = false;
+                // shutdown processor
+                shutdown();
+            }
+        } else {
+            // no bound, if not bound, then server expects bound pdu.
+            if (request.canResponse()) {
+                GenericResponseEvent gresp = new GenericResponseEvent(request.getResponse(), Data.ESME_RINVBNDSTS);
+                offerSmppEvent(gresp);
+            } else {
+                //  cannot response
+            }
+        }
+    }
+    
+    private boolean offerSmppEvent(SmppEvent event) throws InterruptedException {
+        return smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS);
     }
     
     /**
@@ -121,42 +186,65 @@ public class SmppServerProcessor {
                         logger.warn("smppGwId:{}. Null pdu...", gwSession == null ? null : gwSession.getSmppGwId());
                         return;
                     }
-                    // enquire link
-                    if (pdu.isRequest() && Data.ENQUIRE_LINK == pdu.getCommandId()) {
-                        // respond enquire link
-                        DefaultResponseOKEvent rok = new DefaultResponseOKEvent(pdu);
-                        offerSmppEvent(rok);
-                        continue;
-                    }
-                    // Find dialog to dispatch message, if it does not exists
-                    // create new dialog.
-                    Dialog dialog = null;
-                    Long dialogId = dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
-                    if (dialogId != null && (dialog = dialogService.getDialog(dialogId)) != null) {
-                        // Handle event
-                        dialog.handleSmppEvent(smppEvent);
-                    } else {
-                        // Create new Dialog
-                        if (pdu.isRequest() && Data.SUBMIT_SM == pdu.getCommandId()) {
-                            // SmppSessionId is the processor identifier.
-                            Dialog submitDialog = new SmscSubmitSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
-                                                                     gwSession.getSmppSessionId()); // Id to identify the processor
-                            // Register and init new dialog
-                            ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
-                            long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((SubmitSM) pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
-                            dialogService.putDialog(submitDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : cfg.getDefaultValidityPeriod());
-                            // Initialize dialog
-                            submitDialog.init();
+                    // bound
+                    if (!isBound()) {
+                        if (pdu instanceof BindRequest) {
+                            handleBindRequest((Request) pdu);
                         } else {
-                            // unknow / unsupported smpp message
-                            if (pdu.isRequest()) {
-                                // ret nack
-                                GenericNAckEvent nackEv = new GenericNAckEvent(pdu.getSequenceNumber(),
-                                        Data.ESME_RINVCMDID);
-                                // Schedule to dispatch
-                                offerSmppEvent(nackEv);
+                            GenericResponseEvent gresp = new GenericResponseEvent(((Request)pdu).getResponse(), Data.ESME_RINVBNDSTS);
+                            offerSmppEvent(gresp);
+                        }
+                    } else {
+                        // already bound
+                        // enquirelink
+                        if (pdu.isRequest() && Data.ENQUIRE_LINK == pdu.getCommandId()) {
+                            DefaultResponseOKEvent rok = new DefaultResponseOKEvent((Request)pdu);
+                            offerSmppEvent(rok);
+                            return;
+                        }
+                        // Find dialog to dispatch message, if it does not exists
+                        // create new dialog.
+                        Dialog dialog = null;
+                        Long dialogId = dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
+                        if (dialogId != null && (dialog = dialogService.getDialog(dialogId)) != null) {
+                            // Handle event
+                            dialog.handleSmppEvent(smppEvent);
+                        } else { 
+                            if (pdu.isRequest() && Data.SUBMIT_SM == pdu.getCommandId()) {
+                                // Create new Dialog
+                                // SmppSessionId is the processor identifier.
+                                Dialog submitDialog = new SmscSubmitSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
+                                                                         gwSession.getSmppSessionId()); // Id to identify the processor
+                                // Register and init new dialog
+                                ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+                                long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((SubmitSM) pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
+                                dialogService.putDialog(submitDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : cfg.getDefaultValidityPeriod());
+                                // Initialize dialog
+                                submitDialog.init();
+                            } else if (pdu.isRequest()
+                                       && (Data.BIND_TRANSMITTER == pdu.getCommandId()
+                                       || Data.BIND_RECEIVER == pdu.getCommandId()
+                                       || Data.BIND_TRANSCEIVER == pdu.getCommandId())) {
+                                    // already bind
+                                    logger.warn("Already bind. system id:{} smppGwId{} smppSessionId:{}", gwSession.getSystemId(), gwSession.getSmppGwId(), gwSession.getSmppSessionId());
+                                    GenericResponseEvent resp = new GenericResponseEvent(((Request)pdu).getResponse(), Data.ESME_RALYBND);
+                                    offerSmppEvent(resp);
+                            } else if (pdu.isRequest() && Data.UNBIND == pdu.getCommandId()) {
+                                // unbind
+                                logger.warn("Unbind. system id:{} smppGwId{} smppSessionId:{}", gwSession.getSystemId(), gwSession.getSmppGwId(), gwSession.getSmppSessionId());
+                                DefaultResponseOKEvent rok = new DefaultResponseOKEvent((Request)pdu);
+                                offerSmppEvent(rok);
+                                shutdown();
                             } else {
-                                // For response ignore it.
+                                // unknow / unsupported smpp message
+                                if (pdu.isRequest()) {
+                                    // ret nack
+                                    GenericNAckEvent nackEv = new GenericNAckEvent(pdu.getSequenceNumber(), Data.ESME_RINVCMDID);
+                                    // Schedule to dispatch
+                                    offerSmppEvent(nackEv);
+                                } else {
+                                    // For response ignore it.
+                                }
                             }
                         }
                     }
@@ -172,23 +260,10 @@ public class SmppServerProcessor {
         }
     }
     
-    /**
-     * Schedule a single event for delivering to remote SMSC;
-     * 
-     * @param event Event to dispatch
-     * @return 0 -> event was schedule to dispatch. 1 -> Sender is not allowed to dispatch
-     * @throws InterruptedException 
-     */
-    public int offerSmppEvent(SmppEvent event) throws InterruptedException {
-        if (smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
-            return Constants.DISPATCH_EV_OK;
-        }
-        return Constants.DISPATCH_EV_SOURCE_NOT_ALLOWED;
-    }
-    
     public void shutdown() {
         receiver.stop();
         receiving = false;
+        bound = false;
         try {
             if (conn.isOpened()) {
                 conn.close();
@@ -305,5 +380,9 @@ public class SmppServerProcessor {
             // on offer event
             logger.error("On handleServerPDUEvent...", ex);
         }
+    }
+    
+    public boolean isConnected() {
+        return conn == null ? false : conn.isOpened();
     }
 }

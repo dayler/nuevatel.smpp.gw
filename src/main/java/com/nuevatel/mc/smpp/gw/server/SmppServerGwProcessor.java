@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -38,6 +40,8 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
     private Connection serverConn = null;
     
     private ExecutorService service;
+    
+    private ScheduledExecutorService heartbeatService = Executors.newSingleThreadScheduledExecutor();
     
     public SmppServerGwProcessor(SmppGwSession gwSession) {
         super(gwSession);
@@ -78,29 +82,52 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
      * Receive connection request. If it is allowed to create new connection, creates an instance of SmppServerProcessor.
      */
     private void receive() {
+        Connection conn = null;
         try {
-            receiving = false;
-            Connection conn = null;
             conn = serverConn.accept();
             // if an connection is requested
             if (conn != null) {
+                // check bind counter limit
+                if (smppServerProcessorList.size() >= gwSession.getMaxBinds()) {
+                    // limit was reached
+                    logger.info("Connection Request rejected the limit of connections has been exceeded. MaxBinds:{} BindsSize:{}", gwSession.getMaxBinds(), smppServerProcessorList.size());
+                    conn.close();
+                }
                 // Create smppServerProcessor
                 SmppServerProcessor processor = new SmppServerProcessor(gwSession, conn, serverPduEvents, smppEvents);
                 // register processor
                 smppServerProcessorList.add(processor);
-                // dispatch
-                service.execute(() -> processor.dispatch());
                 // receive
                 service.execute(() -> processor.receive());
-                // TODO health check
+                // dispatch
+                service.execute(() -> processor.dispatch());
+                // health check
+                long hearbeatPeriod = cfg.getEnquireLinkPeriod() > 0 ? cfg.getEnquireLinkPeriod() : 30L;
+                heartbeatService.scheduleAtFixedRate(() -> checkHealthOfProcessor(processor), hearbeatPeriod, hearbeatPeriod, TimeUnit.SECONDS);
             } else {
                 // timeout defined on setReceivingTimeout
                 if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
-                    logger.debug("On receive timeout. Awaithing by bew connections...");
+                    logger.debug("On receive timeout. Awaithing by new connections...");
                 }
             }
         } catch (IOException ex) {
             logger.error("Failed on receive...", ex);
+            try {
+                if (conn != null && conn.isOpened()) {
+                    conn.close();
+                }
+            } catch (IOException e) {
+                logger.warn("Failed to close conn", e);
+            }
+        }
+    }
+    
+    private void checkHealthOfProcessor(SmppServerProcessor processor) {
+        if (!processor.isConnected()) {
+            // shutdown processor
+            processor.shutdown();
+            // remove from processors list
+            smppServerProcessorList.remove(processor);
         }
     }
     

@@ -14,6 +14,7 @@ import com.nuevatel.common.cache.CacheBuilder;
 import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
 import com.nuevatel.common.cache.RemovalListener;
+import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.exception.NoDialogCachedObject;
@@ -29,9 +30,14 @@ public class DialogService {
     private LoadingCache<Long, Dialog>dialogCache;
     
     /**
-     * Map smpp message id with its corresponding dialog id.
+     * Map smpp sequence number with its corresponding dialog id.
      */
-    private Map<Integer, Long>smppMsgToDialogMap = new ConcurrentHashMap<>();
+    private Map<Integer, Long>smppSeqIdToDialogMap = new ConcurrentHashMap<>();
+    
+    /**
+     * Map smpp message id with dialog Id.
+     */
+    private Map<String, Long>smppMsgIdToDialogMap = new ConcurrentHashMap<>();
     
     private ExecutorService taskService;
     
@@ -42,8 +48,33 @@ public class DialogService {
         resolveLoadingCache();
     }
     
+    public Long findDialogIdByMessageId(String msgId) {
+        return smppMsgIdToDialogMap.get(msgId);
+    }
+    
+    /**
+     * Register message id with its corresponding dilog id.
+     * 
+     * @param msgId smpp message id to register.
+     * @param dialogId Dialog Id in which register message id.
+     */
+    public void registerMessageId(String msgId, long dialogId) {
+        Dialog dialog = dialogCache.getUnchecked(dialogId);
+        if (dialog == null) {
+            // Dialog is not defined
+            return;
+        }
+        // if current msd id is null, is first time
+        if (!StringUtils.isEmptyOrNull(dialog.getCurrentMsgId())) {
+            smppMsgIdToDialogMap.remove(dialog.getCurrentMsgId());
+        }
+        // regists new message Id for dialog
+        smppMsgIdToDialogMap.put(msgId, dialogId);
+        dialog.setCurrentMsgId(msgId);
+    }
+    
     public Long findDialogIdBySequenceNumber(int seqNumber) {
-        return smppMsgToDialogMap.get(seqNumber);
+        return smppSeqIdToDialogMap.get(seqNumber);
     }
     
     /**
@@ -61,10 +92,11 @@ public class DialogService {
         // register seq number
         if (dialog.getCurrentSequenceNumber() > 0) { // -1 if is the first state for dialog
             // remove old key
-            smppMsgToDialogMap.remove(dialog.getCurrentSequenceNumber());
+            smppSeqIdToDialogMap.remove(dialog.getCurrentSequenceNumber());
         }
         // Register seq number
-        smppMsgToDialogMap.put(newSeqNumber, dialogId);
+        smppSeqIdToDialogMap.put(newSeqNumber, dialogId);
+        dialog.setCurrentSequenceNumber(newSeqNumber);
     }
     
     private void resolveLoadingCache() {
@@ -103,7 +135,12 @@ public class DialogService {
      */
     public void invalidate(Dialog dialog) {
         dialogCache.invalidate(dialog.getDialogId());
-        smppMsgToDialogMap.remove(dialog.getCurrentSequenceNumber());
+        if (dialog.getCurrentSequenceNumber() != -1) {
+            smppSeqIdToDialogMap.remove(dialog.getCurrentSequenceNumber());
+        }
+        if (!StringUtils.isEmptyOrNull(dialog.getCurrentMsgId())) {
+            smppMsgIdToDialogMap.remove(dialog.getCurrentMsgId());
+        }
     }
     
     /**

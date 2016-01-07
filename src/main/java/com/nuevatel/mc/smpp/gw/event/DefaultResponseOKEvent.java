@@ -3,7 +3,6 @@
  */
 package com.nuevatel.mc.smpp.gw.event;
 
-import org.smpp.pdu.PDU;
 import org.smpp.pdu.Request;
 import org.smpp.pdu.Response;
 
@@ -15,9 +14,11 @@ public class DefaultResponseOKEvent extends SmppEvent {
     
     private Response resp;
     
-    public DefaultResponseOKEvent(PDU pdu) {
-        // Get default resp
-        this.resp = ((Request)pdu).getResponse();
+    public DefaultResponseOKEvent(Request request) {
+        if (!request.canResponse()) {
+            throw new IllegalArgumentException("Request:" + request.debugString() + " cannot do response");
+        }
+        resp = request.getResponse();
     }
     
     public Response getDefaultResponse() {

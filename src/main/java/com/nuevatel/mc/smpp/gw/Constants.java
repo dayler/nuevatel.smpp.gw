@@ -49,6 +49,20 @@ public final class Constants {
     public static final byte TP_DFLT_MR = 0;
     public static final byte TP_DFLT_PI = 0;
     
+    /**
+     * SERVICE MESSAGE DEFINITION
+     */
+    public static int NO_SERVICE_MSG = 0x00;
+    public static int SRIFSM_FAILED = -0x01;
+    public static int SRIFSM_EXCEPTION = -0x02;
+    public static int SRIFSM_TIMEOUT = -0x03;
+    public static int NEW_CS_GW_FAILED = -0x04;
+    public static int NEW_CS_GW_EXCEPTION = -0x05;
+    public static int NEW_CS_GW_TIMEOUT = -0x06;
+    public static int SM_O_FAILED = -0x07;
+    public static int SM_O_EXCEPTION = -0x08;
+    public static int SM_O_TIMEOUT = -0x09;
+    
     private Constants() {
         // no op. prevent instantiation.
     }

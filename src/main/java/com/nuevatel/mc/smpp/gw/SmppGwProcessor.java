@@ -6,6 +6,7 @@ package com.nuevatel.mc.smpp.gw;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.smpp.ServerPDUEvent;
 
@@ -39,12 +40,20 @@ public abstract class SmppGwProcessor implements Processor {
         this.gwSession = gwSession;
     }
     
-    public void offerServerPduEvent(ServerPDUEvent event) {
-        serverPduEvents.add(event);
+    public boolean offerServerPduEvent(ServerPDUEvent event) {
+        try {
+            return serverPduEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MICROSECONDS);
+        } catch (InterruptedException e) {
+            return false;
+        }
     }
     
-    public void offerSmppEvent(SmppEvent event) {
-        smppEvents.add(event);
+    public boolean offerSmppEvent(SmppEvent event)  {
+        try {
+            return smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MICROSECONDS);
+        } catch (InterruptedException e) {
+            return false;
+        }
     }
     
     public SmppGwSession getSmppGwSession() {

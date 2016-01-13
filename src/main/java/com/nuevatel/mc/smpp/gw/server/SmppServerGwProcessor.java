@@ -19,6 +19,7 @@ import org.smpp.Connection;
 import org.smpp.TCPIPConnection;
 
 import com.nuevatel.mc.smpp.gw.AllocatorService;
+import com.nuevatel.mc.smpp.gw.SmppGwApp;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
@@ -45,8 +46,8 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
     
     public SmppServerGwProcessor(SmppGwSession gwSession) {
         super(gwSession);
-        // Number of binds to attends
-        service = Executors.newFixedThreadPool(gwSession.getMaxBinds());
+        // Number of binds to allow
+        service = Executors.newFixedThreadPool(gwSession.getMaxBinds() * 2);
     }
     
     /**
@@ -78,6 +79,19 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
         }
     }
     
+    private void registerProcessor(SmppServerProcessor processor) {
+        smppServerProcessorList.add(processor);
+        // Notify bind operation
+        SmppGwApp.getSmppGwApp().setBound(gwSession.getSmppGwId(), gwSession.getSmppSessionId(), smppServerProcessorList.size());
+    }
+    
+    private void unregisterProcessor(SmppServerProcessor processor) {
+        // remove processor from list
+        smppServerProcessorList.remove(processor);
+        // Notify bind operation
+        SmppGwApp.getSmppGwApp().setBound(gwSession.getSmppGwId(), gwSession.getSmppSessionId(), smppServerProcessorList.size());
+    }
+    
     /**
      * Receive connection request. If it is allowed to create new connection, creates an instance of SmppServerProcessor.
      */
@@ -96,7 +110,9 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
                 // Create smppServerProcessor
                 SmppServerProcessor processor = new SmppServerProcessor(gwSession, conn, serverPduEvents, smppEvents);
                 // register processor
-                smppServerProcessorList.add(processor);
+                registerProcessor(processor);
+                // set shutdown delegate. Remove processor from list
+                processor.setOnShutdownDelegate(() -> unregisterProcessor(processor));
                 // receive
                 service.execute(() -> processor.receive());
                 // dispatch
@@ -106,8 +122,8 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
                 heartbeatService.scheduleAtFixedRate(() -> checkHealthOfProcessor(processor), hearbeatPeriod, hearbeatPeriod, TimeUnit.SECONDS);
             } else {
                 // timeout defined on setReceivingTimeout
-                if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
-                    logger.debug("On receive timeout. Awaithing by new connections...");
+                if (logger.isTraceEnabled()) {
+                    logger.trace("On receive timeout. Awaithing by new connections...");
                 }
             }
         } catch (IOException ex) {

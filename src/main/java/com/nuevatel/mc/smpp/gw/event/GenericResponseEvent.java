@@ -32,6 +32,6 @@ public class GenericResponseEvent extends SmppEvent {
     
     @Override
     public SmppEventType type() {
-        return SmppEventType.GenericResponseEvent;
+        return SmppEventType.GenericROkResponseEvent;
     }
 }

@@ -28,6 +28,7 @@ import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogState;
 import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.event.DeliverSmEvent;
+import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.smpp.gw.util.EsmClass;
 import com.nuevatel.mc.smpp.gw.util.TpDcsUtils;
 import com.nuevatel.mc.smpp.gw.util.TpStatusResolver;
@@ -63,13 +64,16 @@ public class SmscDeliverSmDialog extends Dialog {
     
     private byte tpStatus = Tpdu.TP_ST_PERMANENT_ERROR;
     
-    public SmscDeliverSmDialog(long dialogId,
-                           int processorId,
-                           long smMessageId,
+    public SmscDeliverSmDialog(Long dialogId,
+                           Integer processorId,
+                           Long smMessageId,
                            Name fromName,
                            Name toName,
                            SmsDeliver smsDeliver) {
         super(dialogId, processorId);
+        
+        Parameters.checkNull(dialogId, "dialogId");
+        Parameters.checkNull(processorId, "processorId");
         
         Parameters.checkNull(fromName, "fromName");
         Parameters.checkNull(toName, "toName");
@@ -77,7 +81,7 @@ public class SmscDeliverSmDialog extends Dialog {
         
         gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
         this.registeredDelivery = smsDeliver.getTpSri();
-        this.smMessageId = smMessageId;
+        this.smMessageId = smMessageId == null ? 0 : smMessageId;
         this.fromName = fromName;
         this.toName = toName;
         this.smsDeliver = smsDeliver;
@@ -131,19 +135,24 @@ public class SmscDeliverSmDialog extends Dialog {
                     commandStatusCode = pdu.getCommandStatus();
                     state = DialogState.failed;
                     invalidate();
-                } else if (pdu.isOk() && Data.DELIVER_SM_RESP == pdu.getCommandId()) {
+                } else if (pdu.isResponse() && pdu.isOk() && Data.DELIVER_SM_RESP == pdu.getCommandId()) {
                     commandStatusCode = Data.ESME_ROK;
                     state = DialogState.close;
                     invalidate();
                 } else {
-                    // pdu is not ok, or is not DELIVER_SM_RESP
-                    commandStatusCode = Data.ESME_RSYSERR;
+                    commandStatusCode = Data.ESME_RINVCMDID;
                     state = DialogState.failed;
+                    // pdu is not ok, or is not DELIVER_SM_RESP
                     invalidate();
                 }
             } else {
+                if (pdu.isRequest() && pdu.canResponse()) {
+                    // invalid command id
+                    GenericNAckEvent nack = new GenericNAckEvent(pdu.getSequenceNumber(), Data.ESME_RINVCMDID);
+                    gwProcessor.offerSmppEvent(nack);
+                }
                 // Unknown condition. ret nack
-                commandStatusCode = Data.ESME_RSYSERR;
+                commandStatusCode = Data.ESME_RINVCMDID;
                 state = DialogState.failed;
                 invalidate();
             }
@@ -172,6 +181,7 @@ public class SmscDeliverSmDialog extends Dialog {
         ForwardSmORetAsyncCall fwsmoRet = new ForwardSmORetAsyncCall(dialogId, ret, commandStatusCode);
         // async dispatch
         mcDispatcher.dispatch(fwsmoRet);
+        logger.debug("Dispatch ForwardSmORetAsyncCall messageId:{} ret:{} serviceMsg:{}", dialogId, ret, commandStatusCode);
         if (registeredDelivery) {
             LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
             TpAddress destAddr = new TpAddress((byte)(toName.getType() & TpAddress.TON), (byte)(toName.getType() & TpAddress.NPI), toName.getName());
@@ -179,6 +189,7 @@ public class SmscDeliverSmDialog extends Dialog {
             SmsStatusReport smsSr = new SmsStatusReport(false, false, false, (byte) 0x0, destAddr, now, now, tpStatus);
             ForwardSmICall fwsmiCall = new ForwardSmICall(dialogId, smsSr.getTpdu());
             Message msg = mcDispatcher.dispatchAndWait(fwsmiCall);
+            logger.debug("Dispatch ForwardSmICall messageId:{} tpStatus:{}", dialogId, tpStatus);
             if (msg == null || msg.getByte(AppMessages.RET_IE) == AppMessages.FAILED) {
                 // failed
                 logger.warn("Failed to dispatch confirmation delivery to MC. messageId:{}", dialogId);

@@ -29,6 +29,9 @@ public class McDispatcher {
         service = Executors.newFixedThreadPool(size);
     }
     
+    /**
+     * Shutdown service.
+     */
     public void shutdown() {
         if (service == null) {
             return;
@@ -41,6 +44,11 @@ public class McDispatcher {
         }
     }
     
+    /**
+     * Dispatch AppConn message to MC.
+     * 
+     * @param msg Message to dispatch.
+     */
     public void dispatch(McMessage msg) {
         if (msg == null) {
             return;
@@ -54,6 +62,15 @@ public class McDispatcher {
         });
     }
     
+    /**
+     * Dispatch AppConn message and await response.
+     * 
+     * @param msg Message to dispatch.
+     * @return Appconn message response.
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * @throws TimeoutException
+     */
     public Message dispatchAndWait(McMessage msg) throws InterruptedException, ExecutionException, TimeoutException {
         if (msg == null) {
             return null;

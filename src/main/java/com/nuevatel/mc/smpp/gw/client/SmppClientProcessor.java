@@ -9,7 +9,6 @@ import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.Constants;
-import com.nuevatel.mc.smpp.gw.McMessageId;
 import com.nuevatel.mc.smpp.gw.SmppDateUtil;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogService;
@@ -19,6 +18,7 @@ import com.nuevatel.mc.smpp.gw.event.CancelSmEvent;
 import com.nuevatel.mc.smpp.gw.event.DataSmEvent;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
+import com.nuevatel.mc.smpp.gw.event.GenericResponseEvent;
 import com.nuevatel.mc.smpp.gw.event.QuerySmEvent;
 import com.nuevatel.mc.smpp.gw.event.ReplaceSmEvent;
 import com.nuevatel.mc.smpp.gw.event.SmppEvent;
@@ -26,7 +26,6 @@ import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
 import com.nuevatel.mc.smpp.gw.exception.FailedBindOperationException;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.concurrent.BlockingQueue;
@@ -108,8 +107,6 @@ public class SmppClientProcessor {
     private AddressRange addressRange = new AddressRange();
     
     private DialogService dialogService = AllocatorService.getDialogService();
-    
-    private McMessageId mcMsgId = new McMessageId();
     
     private boolean running = false;
     
@@ -241,15 +238,14 @@ public class SmppClientProcessor {
                                 // TODO
                                 System.out.println("******* " + pdu.debugString() + " time " + ZonedDateTime.now().toString());
                                 // SmppSessionId is the processor identifier.
-                                Dialog deliverSmDialog = new EsmeDeliverSmDialog(mcMsgId.newMcMessageId(LocalDateTime.now(), gwSession.getMcId()), // Assign new message id
-                                                                            gwSession.getSmppSessionId()); // Id to identify the processor
-                                // Register and init new dialog
-                                ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
-                                long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((DeliverSM)pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
-                                dialogService.putDialog(deliverSmDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : defaultValidityPeriod);
+                                Dialog deliverSmDialog = new EsmeDeliverSmDialog(gwSession.getSmppSessionId()); // Id to identify the processor
                                 // Initialize dialog
                                 deliverSmDialog.init();
                                 deliverSmDialog.handleSmppEvent(smppEvent);
+                                // Register dialog (mc assing message id)
+                                ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+                                long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((DeliverSM)pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
+                                dialogService.putDialog(deliverSmDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : defaultValidityPeriod);
                             } else {
                                 // unknow / unsupported smpp message
                                 if (pdu.isRequest()) {
@@ -263,7 +259,7 @@ public class SmppClientProcessor {
                             }
                         }
                     }
-                } catch (InterruptedException ex) {
+                } catch (InterruptedException | ValueNotSetException ex) {
                     logger.error("On recieving event, the processor:{} ...", gwSession == null ? null : gwSession.getSmppGwId(), ex);
                 }
             }
@@ -274,26 +270,31 @@ public class SmppClientProcessor {
     
     private Long findDialogId(PDU pdu) throws ValueNotSetException {
         if (pdu.isRequest() && Data.DELIVER_SM == pdu.getCommandId()) {
-            return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
+            DeliverSM deliverSM = (DeliverSM) pdu;
+            // check if deliver sm contains ack
+            if ((deliverSM.getEsmClass() & Data.SM_ESME_DLV_ACK_TYPE) == Data.SM_ESME_DLV_ACK_TYPE) {
+                return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
+            }
+            // other case deliver will originate dialog
+            return null;
         } else if (pdu.isResponse()) {
             return dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
         }
-        
+        // dialog not found
         return null;
     }
     
     /**
+     * TODO remove int
+     * 
      * Schedule a single event for delivering to remote SMSC;
      * 
      * @param event Event to dispatch
      * @return 0 -> event was schedule to dispatch. 1 -> Sender is not allowed to dispatch
      * @throws InterruptedException 
      */
-    public int offerSmppEvent(SmppEvent event) throws InterruptedException {
-        if (smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
-            return Constants.DISPATCH_EV_OK;
-        }
-        return Constants.DISPATCH_EV_SOURCE_NOT_ALLOWED;
+    public boolean offerSmppEvent(SmppEvent event) throws InterruptedException {
+        return smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS);
     }
     
     public void enquireLink() throws ValueNotSetException, // do enquireLink
@@ -396,8 +397,11 @@ public class SmppClientProcessor {
         case ReplaceSmEvent:
             replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
             break;
-        case DefaultResponseEvent:
-            defaultResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
+        case GenericROkResponseEvent:
+            genericResponse(castAs(GenericResponseEvent.class, smppEvent));
+            break;
+        case DefaultROkResponseEvent:
+            defaultROkResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
             break;
         case GenericNAckEvent:
             genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
@@ -406,6 +410,11 @@ public class SmppClientProcessor {
             logger.warn("Unknown SmppEvent...");
             break;
         }
+    }
+
+    private void genericResponse(GenericResponseEvent event) throws ValueNotSetException, WrongSessionStateException, IOException {
+        Parameters.checkNull(event, "event");
+        smppSession.respond(event.getResponse());
     }
 
     /**
@@ -428,7 +437,7 @@ public class SmppClientProcessor {
      * @throws WrongSessionStateException 
      * @throws ValueNotSetException 
      */
-    private void defaultResponse(DefaultResponseOKEvent smResp) throws ValueNotSetException, WrongSessionStateException, IOException {
+    private void defaultROkResponse(DefaultResponseOKEvent smResp) throws ValueNotSetException, WrongSessionStateException, IOException {
         Parameters.checkNull(smResp, "smResp");
         smppSession.respond(smResp.getDefaultResponse());
     }
@@ -441,6 +450,10 @@ public class SmppClientProcessor {
      */
     private void assignSequenceNumber(PDU pdu, long dialogId) {
         pdu.assignSequenceNumber(true);
+        if (dialogId < 0) {
+            // no map
+            return;
+        }
         dialogService.registerSequenceNumber(pdu.getSequenceNumber(), dialogId);
     }
 

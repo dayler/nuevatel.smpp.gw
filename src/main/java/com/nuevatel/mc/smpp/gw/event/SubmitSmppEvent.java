@@ -184,7 +184,7 @@ public class SubmitSmppEvent extends SmppEvent {
             encoding = Constants.CS_GSM7;
             break;
         case TpDcs.CS_UCS2:
-            encoding = Constants.CS_UCS2;
+            encoding = Constants.CS_UTF_16BE;
             break;
         case TpDcs.CS_8_BIT:
             encoding = "";

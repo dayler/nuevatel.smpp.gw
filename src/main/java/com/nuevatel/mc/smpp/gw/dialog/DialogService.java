@@ -14,6 +14,7 @@ import com.nuevatel.common.cache.CacheBuilder;
 import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
 import com.nuevatel.common.cache.RemovalListener;
+import com.nuevatel.common.exception.OperationRuntimeException;
 import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.domain.Config;
@@ -113,7 +114,11 @@ public class DialogService {
      * @param dialogId Id to identify the dialog.
      * @return <code>Dialog</code> to belongs dialogId. <code>null</code> if it not exists.
      */
-    public Dialog getDialog(long dialogId) {
+    public Dialog getDialog(Long dialogId) {
+        if (dialogId == null) {
+            // nullpointer in unboxing
+            return null;
+        }
         return dialogCache.get(dialogId);
     }
     
@@ -125,6 +130,9 @@ public class DialogService {
      */
     public void putDialog(Dialog dialog, long expireAfterWriteTime) {
         if (dialog != null) {
+            if (dialog.getDialogId() < 0) {
+                throw new OperationRuntimeException("dialogId == -1, not asigned dialog Id.");
+            }
             dialogCache.put(dialog.getDialogId(), dialog , expireAfterWriteTime, 0L/* disable after read */, TimeUnit.SECONDS);
         }
     }

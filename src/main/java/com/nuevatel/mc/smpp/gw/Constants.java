@@ -11,7 +11,8 @@ package com.nuevatel.mc.smpp.gw;
 public final class Constants {
     
     public static final String CS_GSM7 = "X-Gsm7Bit";
-    public static final String CS_UCS2 = "UTF-16BE";
+    public static final String CS_UTF_16BE = "UTF-16BE";
+    public static final String CS_UCS_2 = "UCS-2";
     
     /**
      * Timeout (in milliseconds) to poll event from queue.

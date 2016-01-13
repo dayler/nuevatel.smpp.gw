@@ -58,7 +58,9 @@ public class ForwardSmOTask implements Task {
             LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
             ForwardSmOCall fwsmoCall = new ForwardSmOCall(msg);
             // try to in dialog to handle it.
-            Dialog dialog = dialogService.getDialog(fwsmoCall.getMessageId());
+            // TODO debug
+            System.out.println("***** fwsmoCall.getMessageId() " + fwsmoCall.getMessageId() + " fwsmoCall.getSmMessageId() " + fwsmoCall.getSmMessageId() );
+            Dialog dialog = dialogService.getDialog(fwsmoCall.getSmMessageId());
             if (dialog != null) {
                 // find dialog
                 dialog.handleMcMessage(fwsmoCall);

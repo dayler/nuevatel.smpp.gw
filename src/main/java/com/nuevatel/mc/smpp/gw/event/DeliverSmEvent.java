@@ -30,6 +30,8 @@ public class DeliverSmEvent extends SmppEvent {
     
     private int commandStatus = Data.ESME_ROK;
     
+    private boolean deliveryAck = false;
+    
     public DeliverSmEvent(long messageId) {
         setMessageId(messageId);
     }
@@ -104,6 +106,14 @@ public class DeliverSmEvent extends SmppEvent {
     
     public int getCommandStatus() {
         return commandStatus;
+    }
+    
+    public boolean isDeliveryAck() {
+        return deliveryAck;
+    }
+    
+    public void setDeliveryAck(boolean deliveryAck) {
+        this.deliveryAck = deliveryAck;
     }
     
     /**

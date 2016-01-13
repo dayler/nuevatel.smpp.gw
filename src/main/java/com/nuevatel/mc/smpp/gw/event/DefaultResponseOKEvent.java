@@ -31,7 +31,7 @@ public class DefaultResponseOKEvent extends SmppEvent {
     
     @Override
     public SmppEventType type() {
-        return SmppEventType.DefaultResponseEvent;
+        return SmppEventType.DefaultROkResponseEvent;
     }
 
 }

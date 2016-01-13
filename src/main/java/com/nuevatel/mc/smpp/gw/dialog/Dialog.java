@@ -36,6 +36,11 @@ public abstract class Dialog {
     
     protected int commandStatusCode = Data.ESME_ROK;
     
+    public Dialog(int processorId) {
+        // -1 to indicate, no asigned dialog id
+        this(-1, processorId);
+    }
+    
     /**
      * 
      * @param dialogId Dialog id to identify the dialog. It must to the messageId used in the MC local.
@@ -56,6 +61,10 @@ public abstract class Dialog {
     
     public long getDialogId() {
         return dialogId;
+    }
+    
+    protected void setDialogId(long dialogId) {
+        this.dialogId = dialogId;
     }
     
     public void setSmppMessageId(String smppMessageId) {

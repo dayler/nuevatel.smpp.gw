@@ -69,7 +69,7 @@ public class EsmClass {
         return udhi;
     }
 
-    public boolean isReplyPath() {
+    public boolean getReplyPath() {
         return replyPath;
     }
 

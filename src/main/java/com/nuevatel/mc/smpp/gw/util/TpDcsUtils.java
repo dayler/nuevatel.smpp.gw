@@ -27,7 +27,7 @@ public final class TpDcsUtils {
         case TpDcs.CS_GSM7:
             return Constants.CS_GSM7;
         case TpDcs.CS_UCS2:
-            return Constants.CS_UCS2;
+            return Constants.CS_UTF_16BE;
         case TpDcs.CS_8_BIT:
             return "";
         default:
@@ -39,7 +39,7 @@ public final class TpDcsUtils {
      * Based on smppEncoding (from smpp pdu) get corresponding <code>TpDcs</code>.
      * 
      * @param smppEncoding smpp encoding, get it from smpp pdu.
-     * @return <code>TpDcs</code> to corresponds with smppEncoding.
+     * @return <code>TpDcs</code> to corresponds with smppEncoding. <b>By default return TpDcs.CS_GSM7.</b>
      */
     public static TpDcs resolveTpDcs(String smppEncoding) {
         if (StringUtils.isEmptyOrNull(smppEncoding)) {
@@ -49,7 +49,8 @@ public final class TpDcsUtils {
         switch (smppEncoding) {
         case Constants.CS_GSM7:
             return new TpDcs(TpDcs.CS_GSM7);
-        case Constants.CS_UCS2:
+        case Constants.CS_UTF_16BE:
+        case Constants.CS_UCS_2:
             return new TpDcs(TpDcs.CS_UCS2);
         default:
             return new TpDcs(StringUtils.isEmptyOrNull(smppEncoding) ? TpDcs.CS_8_BIT : TpDcs.CS_GSM7);

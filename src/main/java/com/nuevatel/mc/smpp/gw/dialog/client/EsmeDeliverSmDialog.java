@@ -65,8 +65,13 @@ public class EsmeDeliverSmDialog extends Dialog {
     
     private DeliverSM deliverPdu = null;
     
-    public EsmeDeliverSmDialog(long messageId, int processorId) {
-        super(messageId, processorId);
+    /**
+     * Delivery registered message id. Used to confirm delivery request to AppConn server (MC). -1 indicates no set value.
+     */
+    private long fwsmoCallMsgId = -1;
+    
+    public EsmeDeliverSmDialog(int processorId) {
+        super(processorId);
         // select processor
         gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
     }
@@ -76,8 +81,6 @@ public class EsmeDeliverSmDialog extends Dialog {
      */
     @Override
     public void init() {
-        // TODO debug string
-        System.out.println("init");
         state = DialogState.init;
     }
 
@@ -97,14 +100,14 @@ public class EsmeDeliverSmDialog extends Dialog {
             deliverPdu = (DeliverSM) ev.getPDU();
             // do received ok response to remote smsc
             // get register delivery
-            registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED;
+            registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SME_ACK_MASK) != Data.SM_SME_ACK_NOT_REQUESTED;
             // create SmsSubmit
-            TpDcs tpDcs = TpDcsUtils.resolveTpDcs(deliverPdu.getShortMessageEncoding());
+            TpDcs tpDcs = TpDcsUtils.resolveTpDcs(deliverPdu.getShortMessageEncoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
             EsmClass esmClass = new EsmClass(deliverPdu.getEsmClass());
             TpUd tpud = new TpUd(esmClass.getUdhi(), // tpUdhi
                                  tpDcs, // tpDcs
                                  TpUdUtils.resolveTpUdl(tpDcs.getCharSet(), deliverPdu.getShortMessageData().getBuffer()), // tpUdl
-                                 deliverPdu.getShortMessageData().getBuffer()); // tpUd
+                                 TpUdUtils.fixTpUd(tpDcs.getCharSet(), deliverPdu.getShortMessageData().getBuffer())); // tpUd
             SmsSubmit smsSubmit = new SmsSubmit(// tpRd
                                                 true,
                                                 // tpRp
@@ -144,8 +147,10 @@ public class EsmeDeliverSmDialog extends Dialog {
                                                           smsSubmit.getTpdu());
             // dispatch sync message
             Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
+            logger.debug("Disparch ForwardSmICall");
             if (ret == null) {
                 // failed
+                state = DialogState.failed;
                 commandStatusCode = Data.ESME_RSYSERR;
                 invalidate();
                 return;
@@ -158,9 +163,10 @@ public class EsmeDeliverSmDialog extends Dialog {
                 invalidate();
                 return;
             }
-            
-         // TODO debug
-            System.out.println("dispatch fwsmiCall ok");
+            // Set assigned message id
+            setDialogId(fwsmiRet.getMessageId());
+            // TODO debug
+            System.out.println("dispatch fwsmiCall ok. messageId:" + fwsmiRet.getMessageId() + " rds=" + registeredDelivery);
             
             if (!registeredDelivery) {
                 // TODO debug 
@@ -189,10 +195,9 @@ public class EsmeDeliverSmDialog extends Dialog {
         try {
             state = DialogState.forward;
             ForwardSmOCall fwsmoCall = (ForwardSmOCall) msg;
-            
-            // TODO
-            System.out.println("receive deliver notif");
-            
+            // set delivery request confirmation id
+            fwsmoCallMsgId = fwsmoCall.getMessageId();
+            // SmsStatus report
             SmsStatusReport smsSr = new SmsStatusReport(fwsmoCall.getTpdu());
             commandStatusCode = TpStatusResolver.resolveSmppCommandStatus(smsSr.getTpSt());
             if (Data.ESME_ROK == commandStatusCode) {
@@ -222,8 +227,6 @@ public class EsmeDeliverSmDialog extends Dialog {
 
     @Override
     public void execute() {
-        // TODO
-        System.err.println("execute delivery");
         // serviceMessage = smpp commandStatus
         if (DialogState.close.equals(state) && commandStatusCode == Data.ESME_ROK) {
             // deliver ROK sm response, message delivered.
@@ -236,15 +239,13 @@ public class EsmeDeliverSmDialog extends Dialog {
         }
         // only if delivery status is required
         if (registeredDelivery) {
-            // TODO
-            System.err.println("execute delivery");
             if (DialogState.close.equals(state) && Data.ESME_ROK == commandStatusCode) {
                 // notify ok
-                ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(dialogId, AppMessages.ACCEPTED, commandStatusCode);
+                ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(fwsmoCallMsgId, AppMessages.ACCEPTED, commandStatusCode);
                 mcDispatcher.dispatch(fwsmo);
             } else {
                 // failed
-                ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(dialogId, AppMessages.FAILED, commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode);
+                ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(fwsmoCallMsgId, AppMessages.FAILED, commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode);
                 mcDispatcher.dispatch(fwsmo);
             }
         }

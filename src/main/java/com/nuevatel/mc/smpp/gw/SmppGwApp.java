@@ -7,7 +7,7 @@ import com.nuevatel.mc.appconn.McMessage;
 import com.nuevatel.mc.common.BaseApp;
 import com.nuevatel.mc.common.GenericApp;
 import com.nuevatel.mc.smpp.gw.appconn.ForwardSmOTask;
-import com.nuevatel.mc.smpp.gw.client.SmppClienGwProcessor;
+import com.nuevatel.mc.smpp.gw.client.SmppClientGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession.MGMT_STATE;
 import com.nuevatel.mc.smpp.gw.server.SmppServerGwProcessor;
@@ -156,9 +156,10 @@ public class SmppGwApp extends GenericApp {
     }
     /**
      * Sets the bound.
-     * @param smppGwId
-     * @param smppSessionId
-     * @param bound
+     * 
+     * @param smppGwId Smpp gateway id.
+     * @param smppSessionId Smpp session id.
+     * @param bound Actual number of binds.
      */
     public void setBound(int smppGwId, int smppSessionId, int bound) {
         WsClient wsClient = new WsClient(getMgmt().getApp().getWsURL());
@@ -248,6 +249,6 @@ public class SmppGwApp extends GenericApp {
             return new SmppServerGwProcessor(gwSession);
         }
         // Client
-        return new SmppClienGwProcessor(gwSession);
+        return new SmppClientGwProcessor(gwSession);
     }
 }

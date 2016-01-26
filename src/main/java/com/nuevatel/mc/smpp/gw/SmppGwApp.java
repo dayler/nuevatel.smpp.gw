@@ -115,7 +115,8 @@ public class SmppGwApp extends GenericApp {
                     && !(state == STATE.UNKNOWN
                     || state == STATE.OFFLINE)) {
                     ((ProxyApp) proxyApp).getAppClient().start();
-                } else if (state == STATE.UNKNOWN
+                }
+                else if (state == STATE.UNKNOWN
                         || state == STATE.OFFLINE) {
                     ((ProxyApp) proxyApp).getAppClient().interrupt();
                 }
@@ -148,8 +149,9 @@ public class SmppGwApp extends GenericApp {
     }
     
     /**
+     * Gets an App client instance.
      * 
-     * @return AppClient instance.
+     * @return AppClient.
      */
     public AppClient getAppClient() {
         return ((ProxyApp)getRemoteBaseApp(nextRemoteBaseAppId())).getAppClient();
@@ -174,6 +176,12 @@ public class SmppGwApp extends GenericApp {
         }
     }
     
+    /**
+     * Gets <code>SmppGwSession</code> instance to corresponds with <code>smppGwId</code>.
+     * 
+     * @param smppGwId
+     * @return
+     */
     public SmppGwSession getSmppGwSession(int smppGwId) {
         return smppGwSessionMap.get(smppGwId);
     }
@@ -238,10 +246,11 @@ public class SmppGwApp extends GenericApp {
     }
 
     /**
+     * Gets <code>ServerGwProcessor</code> for SMPP_TYPE.ESME SmppClientProcessor in other case.
      * 
      * @param smppType
      * @param gwSession
-     * @return ServerGwProcessor for SMPP_TYPE.ESME SmppClientProcessor in other case.
+     * @return ServerGwProcessor
      */
     private SmppGwProcessor makeGwProcessor(SmppGwSession.SMPP_TYPE smppType, SmppGwSession gwSession) {
         if (SmppGwSession.SMPP_TYPE.SMSC.equals(smppType)) {

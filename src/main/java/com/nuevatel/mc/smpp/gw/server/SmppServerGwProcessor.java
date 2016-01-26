@@ -1,13 +1,7 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package com.nuevatel.mc.smpp.gw.server;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -18,22 +12,31 @@ import org.apache.logging.log4j.Logger;
 import org.smpp.Connection;
 import org.smpp.TCPIPConnection;
 
+import com.nuevatel.common.exception.OperationException;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.SmppGwApp;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**
- *
- * @author asalazar
+ * 
+ * <p>The SmppServerGwProcessor class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Smpp Server Gateway processor, is creating an instance of this class for each Smpp Session defined.
+ * 
+ * @author Ariel Salazar
+ * @version 1.0
+ * @since 1.8
  */
 public class SmppServerGwProcessor extends SmppGwProcessor {
     
+    /* Constants */
+    private static final int BACKLOG = 4;
+    
     private static Logger logger = LogManager.getLogger(SmppServerGwProcessor.class);
     
-    private List<SmppServerProcessor>smppServerProcessorList = new ArrayList<>();
-    
+    /* Private variables */
     private Config cfg = AllocatorService.getConfig();
     
     private boolean receiving = false;
@@ -44,15 +47,16 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
     
     private ScheduledExecutorService heartbeatService = Executors.newSingleThreadScheduledExecutor();
     
+    /**
+     * SmppServerGwProcessor constructor.
+     * @param gwSession
+     */
     public SmppServerGwProcessor(SmppGwSession gwSession) {
         super(gwSession);
-        // Number of binds to allow
-        service = Executors.newFixedThreadPool(gwSession.getMaxBinds() * 2);
+        // Number of binds to allow. 4 is the backup to responds rejected connections.
+        service = Executors.newFixedThreadPool(gwSession.getMaxBinds() * 2 + BACKLOG);
     }
     
-    /**
-     * Initialize SmppServerListener, open serverConn. Start receiving routine.
-     */
     @Override
     public void execute() {
         try {
@@ -67,7 +71,8 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
             
             if (isReceiving()) {
                 logger.info("SmppGwSessionId:{} Ready to receive connection requests...", gwSession.getSmppGwId());
-            } else {
+            }
+            else {
                 logger.warn("SmppGwSessionId:{} SmppServerListener is not initialized properly...", gwSession.getSmppGwId());
             }
             // receive
@@ -79,19 +84,6 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
         }
     }
     
-    private void registerProcessor(SmppServerProcessor processor) {
-        smppServerProcessorList.add(processor);
-        // Notify bind operation
-        SmppGwApp.getSmppGwApp().setBound(gwSession.getSmppGwId(), gwSession.getSmppSessionId(), smppServerProcessorList.size());
-    }
-    
-    private void unregisterProcessor(SmppServerProcessor processor) {
-        // remove processor from list
-        smppServerProcessorList.remove(processor);
-        // Notify bind operation
-        SmppGwApp.getSmppGwApp().setBound(gwSession.getSmppGwId(), gwSession.getSmppSessionId(), smppServerProcessorList.size());
-    }
-    
     /**
      * Receive connection request. If it is allowed to create new connection, creates an instance of SmppServerProcessor.
      */
@@ -101,66 +93,65 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
             conn = serverConn.accept();
             // if an connection is requested
             if (conn != null) {
-                // check bind counter limit
-                if (smppServerProcessorList.size() >= gwSession.getMaxBinds()) {
-                    // limit was reached
-                    logger.info("Connection Request rejected the limit of connections has been exceeded. MaxBinds:{} BindsSize:{}", gwSession.getMaxBinds(), smppServerProcessorList.size());
-                    conn.close();
-                }
+                // Exceeded backlog, close connection
+                if (countOfProcessors() > gwSession.getMaxBinds() + BACKLOG) conn.close();
                 // Create smppServerProcessor
-                SmppServerProcessor processor = new SmppServerProcessor(gwSession, conn, serverPduEvents, smppEvents);
+                SmppServerProcessor processor = new SmppServerProcessor(gwSession, conn, throtlleCounter);
+                // authorized bind op
+                processor.setAuthorizedBind(gwSession.getMaxBinds() == 0 || countOfBoundProcessors() < gwSession.getMaxBinds());
                 // register processor
-                registerProcessor(processor);
-                // set shutdown delegate. Remove processor from list
-                processor.setOnShutdownDelegate(() -> unregisterProcessor(processor));
+                registerSmppProcessor(processor);
+                // set shutdown delegate. Remove processor from list and update bind count
+                processor.setOnShutdownDelegate(() -> { unregisterSmppProcessor(processor); updateBindCount();} );
+                // update bind count
+                processor.setOnBindDelegate(() -> updateBindCount());
                 // receive
                 service.execute(() -> processor.receive());
                 // dispatch
                 service.execute(() -> processor.dispatch());
                 // health check
-                long hearbeatPeriod = cfg.getEnquireLinkPeriod() > 0 ? cfg.getEnquireLinkPeriod() : 30L;
-                heartbeatService.scheduleAtFixedRate(() -> checkHealthOfProcessor(processor), hearbeatPeriod, hearbeatPeriod, TimeUnit.SECONDS);
-            } else {
-                // timeout defined on setReceivingTimeout
-                if (logger.isTraceEnabled()) {
-                    logger.trace("On receive timeout. Awaithing by new connections...");
-                }
+                heartbeatService.scheduleAtFixedRate(() -> checkHealthOfProcessor(processor), cfg.getHeartbeatPeriod(), cfg.getHeartbeatPeriod(), TimeUnit.SECONDS);
             }
-        } catch (IOException ex) {
+            else {
+                // timeout defined on setReceivingTimeout
+                if (logger.isTraceEnabled()) logger.trace("On receive timeout. Awaithing by new connections...");
+            }
+        } catch (IOException | OperationException ex) {
             logger.error("Failed on receive...", ex);
             try {
-                if (conn != null && conn.isOpened()) {
-                    conn.close();
-                }
+                if (conn != null) conn.close();
             } catch (IOException e) {
                 logger.warn("Failed to close conn", e);
             }
         }
     }
     
+    /**
+     * Check connection health. 
+     * @param processor
+     */
     private void checkHealthOfProcessor(SmppServerProcessor processor) {
-        if (!processor.isConnected()) {
-            // shutdown processor
-            processor.shutdown();
-            // remove from processors list
-            smppServerProcessorList.remove(processor);
-        }
+        // shutdown processor. On shutdown delegate will remove it from map
+        if (!processor.isConnected()) processor.shutdown();
+        unregisterSmppProcessor(processor);
     }
     
     @Override
     public void shutdown(int i) {
         try {
             // stop processors
-            smppServerProcessorList.forEach(p -> p.shutdown());
-            if (serverConn != null && serverConn.isOpened()) {
-                // Try to close server connection listener
-                serverConn.close();
-            }
+            shutdownAllSmppProcessors();
+            // Try to close server connection listener
+            if (serverConn != null && serverConn.isOpened()) serverConn.close();
         } catch (IOException ex) {
             logger.warn("Failed to close serverConn...");
         }
     }
     
+    /**
+     * <code>true</code> if the processor is receiving smpp requests.
+     * @return
+     */
     public boolean isReceiving() {
         return receiving;
     }

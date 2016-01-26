@@ -21,14 +21,6 @@ public final class TpUdUtils {
         // no op
     }
     
-    /**
-     * 
-     * @return tpudl for tpud.
-     */
-    public static byte resolveTpUdl(byte charSet, byte[] data) {
-        return (byte)(TpDcs.CS_UCS2 == charSet ? data.length << 1 : data.length);
-    }
-    
     public static byte[] fixTpUd(byte charSet, byte[] data) {
         return TpDcs.CS_GSM7 == charSet ? getSmsGsm7(data) : data;
     }

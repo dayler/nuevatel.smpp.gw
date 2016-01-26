@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.dialog.client;
 
 import java.time.ZoneId;
@@ -28,6 +26,7 @@ import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogState;
 import com.nuevatel.mc.smpp.gw.dialog.DialogType;
+import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericNAckEvent;
 import com.nuevatel.mc.smpp.gw.util.EsmClass;
@@ -41,6 +40,9 @@ import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.TpUd;
 
 /**
+ * <p>The EsmeDeliverSmDialog class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2015</p>
+ * 
  * Handle incoming deliver message from remote smsc to local smpp client.
  * <br/>
  * (1) is enable rds.<br/>
@@ -53,10 +55,12 @@ import com.nuevatel.mc.tpdu.TpUd;
  * (7) Finish the transaction.<br/>
  * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public class EsmeDeliverSmDialog extends Dialog {
     
+    /* private variables */
     private static Logger logger = LogManager.getLogger(EsmeDeliverSmDialog.class);
     
     private SmppGwProcessor gwProcessor;
@@ -65,28 +69,29 @@ public class EsmeDeliverSmDialog extends Dialog {
     
     private DeliverSM deliverPdu = null;
     
+    private Config cfg = AllocatorService.getConfig();
+    
     /**
      * Delivery registered message id. Used to confirm delivery request to AppConn server (MC). -1 indicates no set value.
      */
     private long fwsmoCallMsgId = -1;
     
-    public EsmeDeliverSmDialog(int processorId) {
-        super(processorId);
-        // select processor
-        gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
-    }
-
     /**
-     * {@inheritDoc}
+     * Creates a new instance of EsmeDeliverSmDialog.
+     * @param gwProcessorId
+     * @param processorId
      */
+    public EsmeDeliverSmDialog(int gwProcessorId, int processorId) {
+        super(gwProcessorId, processorId);
+        // select processor
+        gwProcessor = AllocatorService.getSmppGwProcessor(gwProcessorId);
+    }
+    
     @Override
     public void init() {
         state = DialogState.init;
     }
-
-    /**
-     * {@inheritDoc}
-     */
+    
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
         if (!(ev.getPDU() instanceof DeliverSM)) {
@@ -102,11 +107,11 @@ public class EsmeDeliverSmDialog extends Dialog {
             // get register delivery
             registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SME_ACK_MASK) != Data.SM_SME_ACK_NOT_REQUESTED;
             // create SmsSubmit
-            TpDcs tpDcs = TpDcsUtils.resolveTpDcs(deliverPdu.getShortMessageEncoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
+            TpDcs tpDcs = TpDcsUtils.resolveTpDcs(deliverPdu.getDataCoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
             EsmClass esmClass = new EsmClass(deliverPdu.getEsmClass());
             TpUd tpud = new TpUd(esmClass.getUdhi(), // tpUdhi
                                  tpDcs, // tpDcs
-                                 TpUdUtils.resolveTpUdl(tpDcs.getCharSet(), deliverPdu.getShortMessageData().getBuffer()), // tpUdl
+                                 (byte) deliverPdu.getShortMessageData().getBuffer().length, // tpUdl
                                  TpUdUtils.fixTpUd(tpDcs.getCharSet(), deliverPdu.getShortMessageData().getBuffer())); // tpUd
             SmsSubmit smsSubmit = new SmsSubmit(// tpRd
                                                 true,
@@ -145,9 +150,13 @@ public class EsmeDeliverSmDialog extends Dialog {
                                                           new Name(deliverPdu.getSourceAddr().getAddress(), (byte)(deliverPdu.getSourceAddr().getTon() | deliverPdu.getSourceAddr().getNpi())),
                                                           // tpdu
                                                           smsSubmit.getTpdu());
+            if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
+                logger.debug("ForwardSmICall smppServiceType:{} smppScheduleDeliveryTime:{} smppGwId:{} smppSessionId:{} fromName:{} tpdu:{} | rds:{} tpDcs:{}",
+                             fwsmiCall.getSmppServiceType(), fwsmiCall.getSmppScheduleDeliveryTime(), fwsmiCall.getSmppGwId(), fwsmiCall.getSmppSessionId(),
+                             fwsmiCall.getFromName(), fwsmiCall.getTpdu(), registeredDelivery, tpud.getCharSet());
+            }
             // dispatch sync message
             Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
-            logger.debug("Disparch ForwardSmICall");
             if (ret == null) {
                 // failed
                 state = DialogState.failed;
@@ -156,6 +165,7 @@ public class EsmeDeliverSmDialog extends Dialog {
                 return;
             }
             ForwardSmIRet fwsmiRet = new ForwardSmIRet(ret);
+            logger.debug("ForwardSmIRet messageId:{} ret:{}", fwsmiRet.getMessageId(), fwsmiRet.getRet());
             if (AppMessages.FAILED == fwsmiRet.getRet()) {
                 // failed
                 state = DialogState.failed;
@@ -165,12 +175,11 @@ public class EsmeDeliverSmDialog extends Dialog {
             }
             // Set assigned message id
             setDialogId(fwsmiRet.getMessageId());
-            // TODO debug
-            System.out.println("dispatch fwsmiCall ok. messageId:" + fwsmiRet.getMessageId() + " rds=" + registeredDelivery);
-            
+            // Register dialog (mc assing message id)
+            long tmpValidutyPeriod = SmppDateUtil.parseDateTime(now, deliverPdu.getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
+            dialogService.putDialog(this, tmpValidutyPeriod > 0 ? tmpValidutyPeriod : cfg.getDefaultValidityPeriod());
+            logger.info("Create Dialog. dialogId:{} rds:{}", dialogId, registeredDelivery);
             if (!registeredDelivery) {
-                // TODO debug 
-                System.out.println("registeredDelivery invalidate...");
                 // No await registered delivery
                 state = DialogState.close;
                 invalidate();
@@ -179,16 +188,20 @@ public class EsmeDeliverSmDialog extends Dialog {
             // For registered delivery enable await confirmation message from MC. No invalidate.
         } catch (Throwable ex) {
             logger.warn("Failed to initiate DeliverSmDialog. PDU:{}", deliverPdu == null ? null : deliverPdu.debugString());
-            if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
-                logger.warn("Exception:", ex);
-            }
+            if (logger.isDebugEnabled() || logger.isTraceEnabled()) logger.warn("Exception:", ex);
             // dispatch no ok
             commandStatusCode = Data.ESME_RSYSERR;
             // finalize dialog
             invalidate();
         }
     }
-
+    
+    @Override
+    protected void invalidate() {
+        logger.info("Invalidate Dialog, dialogId:{} rds=:{}", dialogId, registeredDelivery);
+        super.invalidate();
+    }
+    
     @Override
     public void handleMcMessage(McMessage msg) {
         Parameters.checkNull(msg, "msg");
@@ -200,12 +213,14 @@ public class EsmeDeliverSmDialog extends Dialog {
             // SmsStatus report
             SmsStatusReport smsSr = new SmsStatusReport(fwsmoCall.getTpdu());
             commandStatusCode = TpStatusResolver.resolveSmppCommandStatus(smsSr.getTpSt());
+            logger.debug("ForwardSmOCall messageId:{} tpSt:{}", fwsmoCallMsgId, smsSr.getTpSt());
             if (Data.ESME_ROK == commandStatusCode) {
                 // Everything is ok, close dialog and invalidate.
                 state = DialogState.close;
                 invalidate();
                 return;
-            } else {
+            }
+            else {
                 // Failed
                 state = DialogState.failed;
                 invalidate();
@@ -217,9 +232,6 @@ public class EsmeDeliverSmDialog extends Dialog {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public DialogType getType() {
         return DialogType.esme_deliver;
@@ -227,14 +239,16 @@ public class EsmeDeliverSmDialog extends Dialog {
 
     @Override
     public void execute() {
+        logger.info("Execute Dialog. dialogId{} rds:{} state:{}", dialogId, registeredDelivery, state);
         // serviceMessage = smpp commandStatus
         if (DialogState.close.equals(state) && commandStatusCode == Data.ESME_ROK) {
             // deliver ROK sm response, message delivered.
             DefaultResponseOKEvent respEsmeROk = new DefaultResponseOKEvent(deliverPdu);
-            gwProcessor.offerSmppEvent(respEsmeROk);
-        } else {
+            gwProcessor.getSmppProcessor(processorId).offerSmppEvent(respEsmeROk);
+        }
+        else {
             // No in close estate means an error occurred in the work flow.
-            gwProcessor.offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));
+            gwProcessor.getSmppProcessor(processorId).offerSmppEvent(new GenericNAckEvent(deliverPdu.getSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));
             return;
         }
         // only if delivery status is required
@@ -242,10 +256,13 @@ public class EsmeDeliverSmDialog extends Dialog {
             if (DialogState.close.equals(state) && Data.ESME_ROK == commandStatusCode) {
                 // notify ok
                 ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(fwsmoCallMsgId, AppMessages.ACCEPTED, commandStatusCode);
+                logger.debug("ForwardSmORetAsyncCall messageId:{} ret:{} serviceMessage:{}", fwsmo.getMessageId(), fwsmo.getRet(), fwsmo.getServiceMsg());
                 mcDispatcher.dispatch(fwsmo);
-            } else {
+            }
+            else {
                 // failed
                 ForwardSmORetAsyncCall fwsmo = new ForwardSmORetAsyncCall(fwsmoCallMsgId, AppMessages.FAILED, commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode);
+                logger.debug("ForwardSmORetAsyncCall messageId:{} ret:{} serviceMessage:{}", fwsmo.getMessageId(), fwsmo.getRet(), fwsmo.getServiceMsg());
                 mcDispatcher.dispatch(fwsmo);
             }
         }

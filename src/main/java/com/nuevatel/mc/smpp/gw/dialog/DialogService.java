@@ -1,9 +1,6 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.dialog;
 
-import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -13,7 +10,6 @@ import java.util.concurrent.TimeUnit;
 import com.nuevatel.common.cache.CacheBuilder;
 import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
-import com.nuevatel.common.cache.RemovalListener;
 import com.nuevatel.common.exception.OperationRuntimeException;
 import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
@@ -21,12 +17,19 @@ import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.exception.NoDialogCachedObject;
 
 /**
+ * 
+ * <p>The DialogService class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
  * Handle Dialog cache service
  * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public class DialogService {
+    
+    /* Private variables */
     
     private LoadingCache<Long, Dialog>dialogCache;
     
@@ -44,11 +47,20 @@ public class DialogService {
     
     private Config cfg = AllocatorService.getConfig();
     
+    /**
+     * Dialog service constructor. No need params.
+     */
     public DialogService() {
         taskService = Executors.newFixedThreadPool(cfg.getDialogCacheTaskConcurrencyLevel());
         resolveLoadingCache();
     }
     
+    /**
+     * Find dialog Id, based on smpp message id.
+     * 
+     * @param msgId
+     * @return
+     */
     public Long findDialogIdByMessageId(String msgId) {
         return smppMsgIdToDialogMap.get(msgId);
     }
@@ -61,14 +73,10 @@ public class DialogService {
      */
     public void registerMessageId(String msgId, long dialogId) {
         Dialog dialog = dialogCache.getUnchecked(dialogId);
-        if (dialog == null) {
-            // Dialog is not defined
-            return;
-        }
+        // Dialog is not defined
+        if (dialog == null) return;
         // if current msd id is null, is first time
-        if (!StringUtils.isEmptyOrNull(dialog.getCurrentMsgId())) {
-            smppMsgIdToDialogMap.remove(dialog.getCurrentMsgId());
-        }
+        if (!StringUtils.isEmptyOrNull(dialog.getCurrentMsgId())) smppMsgIdToDialogMap.remove(dialog.getCurrentMsgId());
         // regists new message Id for dialog
         smppMsgIdToDialogMap.put(msgId, dialogId);
         dialog.setCurrentMsgId(msgId);
@@ -86,10 +94,8 @@ public class DialogService {
      */
     public void registerSequenceNumber(int newSeqNumber, long dialogId) {
         Dialog dialog = dialogCache.getUnchecked(dialogId);
-        if (dialog == null) {
-            // Dialog not defined
-            return;
-        }
+        // Dialog not defined
+        if (dialog == null) return;
         // register seq number
         if (dialog.getCurrentSequenceNumber() > 0) { // -1 if is the first state for dialog
             // remove old key
@@ -101,32 +107,31 @@ public class DialogService {
     }
     
     private void resolveLoadingCache() {
-        int size = AllocatorService.getConfig().getDialogCacheConcurrencyLevel();
+        int size = cfg.getDialogCacheConcurrencyLevel();
         long expireAfterWriteTime = AllocatorService.getConfig().getDialogCacheExpireAfterWriteTime();
         dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime)
                                                     .setSize(size)
                                                     .setTimeUnit(TimeUnit.SECONDS)
-                                                    .buildSimpleLoadingCache(new DialogLoader(), new OnRemoveDialogListener(taskService));
+                                                    .buildSimpleLoadingCache(new DialogLoader(), (k, d) -> onRemoveDialog(k, d));
     }
     
     /**
+     * Get <code>Dialog</code> to belongs dialogId. <code>null</code> if it not exists.
      * 
-     * @param dialogId Id to identify the dialog.
-     * @return <code>Dialog</code> to belongs dialogId. <code>null</code> if it not exists.
+     * @param dialogId
+     * @return 
      */
     public Dialog getDialog(Long dialogId) {
-        if (dialogId == null) {
-            // nullpointer in unboxing
-            return null;
-        }
+        // nullpointer in unboxing
+        if (dialogId == null) return null;
         return dialogCache.get(dialogId);
     }
     
     /**
      * Register a dialog in the cache.
      * 
-     * @param dialog Dialog to register.
-     * @param expireAfterWriteTime Time in seconds after which it is invalidated. 
+     * @param dialog 
+     * @param expireAfterWriteTime Time in seconds after which it is forced to invalidated. 
      */
     public void putDialog(Dialog dialog, long expireAfterWriteTime) {
         if (dialog != null) {
@@ -138,8 +143,9 @@ public class DialogService {
     }
     
     /**
+     * Invalidate Dialog.
      * 
-     * @param dialog Dialog to invalidate
+     * @param dialog
      */
     public void invalidate(Dialog dialog) {
         dialogCache.invalidate(dialog.getDialogId());
@@ -161,7 +167,7 @@ public class DialogService {
     }
     
     /**
-     * No action should not call never.
+     * No action should never call.
      */
     private static final class DialogLoader implements CacheLoader<Long, Dialog> {
 
@@ -171,22 +177,16 @@ public class DialogService {
         }
     }
     
-    private static final class OnRemoveDialogListener implements RemovalListener<Long, Dialog> {
-        
-        private ExecutorService taskService;
-        
-        public OnRemoveDialogListener(ExecutorService taskService) {
-            this.taskService = taskService;
-        }
-        
-        @Override
-        public void onRemoval(Long key, Dialog dialog) {
-            // TODO remove debug string
-            System.out.println("++++++++++ Release " + dialog.dialogId + " time " + ZonedDateTime.now().toString());
-            if (dialog != null) {
-                // execute task.
-                taskService.execute(()->dialog.execute());
-            }
+    /**
+     * Task to execute when a {@link Dialog} is invalidating.
+     * 
+     * @param key
+     * @param dialog
+     */
+    private void onRemoveDialog(Long key, Dialog dialog) {
+        if (dialog != null) {
+            // execute task.
+            taskService.execute(()->dialog.execute());
         }
     }
 }

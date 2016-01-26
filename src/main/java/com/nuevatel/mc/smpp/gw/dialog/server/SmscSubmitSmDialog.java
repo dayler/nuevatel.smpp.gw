@@ -30,6 +30,7 @@ import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogState;
 import com.nuevatel.mc.smpp.gw.dialog.DialogType;
+import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.DeliverSmEvent;
 import com.nuevatel.mc.smpp.gw.util.EsmClass;
@@ -43,13 +44,28 @@ import com.nuevatel.mc.tpdu.TpDcs;
 import com.nuevatel.mc.tpdu.TpUd;
 
 /**
+ * 
+ * 
  * @author Ariel Salazar
  *
+ */
+
+/**
+ * 
+ * <p>The SmscSubmitSmDialog class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Handle incoming smpp messages from remote SMSC to local MC.
+ * 
+ * @author Ariel Salazar
+ * @version 1.0
+ * @since 1.8
  */
 public class SmscSubmitSmDialog extends Dialog {
     
     private static Logger logger = LogManager.getLogger(SmscSubmitSmDialog.class);
     
+    /* Private variables */
     private boolean registeredDelivery;
     
     private SmppGwProcessor gwProcessor;
@@ -58,29 +74,31 @@ public class SmscSubmitSmDialog extends Dialog {
 
     private String smppMsgId = "";
     
-    /**
+    /*
      * Delivery registered message id. Used to confirm delivery request to AppConn server (MC). -1 indicates no set value.
      */
     private long fwsmoCallMsgId = -1;
-
-    public SmscSubmitSmDialog(int processorId) {
-        super(processorId);
-        // select processor
-        gwProcessor = AllocatorService.getSmppGwProcessor(processorId);
-    }
-
+    
+    private Config cfg = AllocatorService.getConfig();
+    
     /**
-     * {@inheritDoc}
+     * Create an instance of <code>SmscSubmitSmDialog</code>.
+     * 
+     * @param gwProcessorId
+     * @param processorId
      */
+    public SmscSubmitSmDialog(int gwProcessorId, int processorId) {
+        super(gwProcessorId, processorId);
+        // select processor
+        gwProcessor = AllocatorService.getSmppGwProcessor(gwProcessorId);
+    }
+    
     @Override
     public void init() {
         // init
         state = DialogState.init;
     }
-
-    /**
-     * {@inheritDoc}
-     */
+    
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
         PDU pdu = ev.getPDU();
@@ -91,11 +109,13 @@ public class SmscSubmitSmDialog extends Dialog {
                 state = DialogState.forward;
                 // no ret
                 handleSubmitSm((SubmitSM) pdu);
-            } else if (pdu.isResponse() && pdu.isOk() && pdu.getCommandId() == Data.DELIVER_SM_RESP) {
+            }
+            else if (pdu.isResponse() && pdu.isOk() && pdu.getCommandId() == Data.DELIVER_SM_RESP) {
                 // deliverSm resp
                 // no ret
                 handleDeliverSmResp(pdu);
-            } else {
+            }
+            else {
                 // failed
                 state = DialogState.failed;
                 ret = AppMessages.FAILED;
@@ -110,6 +130,11 @@ public class SmscSubmitSmDialog extends Dialog {
         }
     }
     
+    /**
+     * Handle <code>DeliverSm</code> pdu message.
+     * 
+     * @param pdu
+     */
     private void handleDeliverSmResp(PDU pdu) {
         commandStatusCode = pdu.getCommandStatus();
         if (pdu.isResponse() && pdu.isOk()) {
@@ -120,17 +145,23 @@ public class SmscSubmitSmDialog extends Dialog {
         invalidate();
     }
     
+    /**
+     * Handle <code>SubmitSm</code> pdu message.
+     * 
+     * @param submitSmPdu
+     * @throws Exception
+     */
     private void handleSubmitSm(SubmitSM submitSmPdu) throws Exception {
         // resf time
         ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
         // registered delivery
         registeredDelivery = (submitSmPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) == Data.SM_SMSC_RECEIPT_REQUESTED;
         // SmsSubmit
-        TpDcs tpDcs = TpDcsUtils.resolveTpDcs(submitSmPdu.getShortMessageEncoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
+        TpDcs tpDcs = TpDcsUtils.resolveTpDcs(submitSmPdu.getDataCoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
         EsmClass esmClass = new EsmClass(submitSmPdu.getEsmClass());
         TpUd tpud = new TpUd(esmClass.getUdhi(), // tpUdhi
                              tpDcs, // tpDcs
-                             TpUdUtils.resolveTpUdl(tpDcs.getCharSet(), submitSmPdu.getShortMessageData().getBuffer()), // tpUdl
+                             (byte) submitSmPdu.getShortMessageData().getBuffer().length, // tpUdl
                              TpUdUtils.fixTpUd(tpDcs.getCharSet(), submitSmPdu.getShortMessageData().getBuffer())); // tpUd
         SmsSubmit smsSubmit = new SmsSubmit(// tpRd
                                             true,
@@ -169,6 +200,12 @@ public class SmscSubmitSmDialog extends Dialog {
                                                       new Name(submitSmPdu.getSourceAddr().getAddress(), (byte)(submitSmPdu.getSourceAddr().getTon() | submitSmPdu.getSourceAddr().getNpi())),
                                                       // tpdu
                                                       smsSubmit.getTpdu());
+        if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
+            logger.debug("ForwardSmICall smppServiceType:{} smppScheduleDeliveryTime:{} smppReplaceIfPresentFlag:{} smppGwId:{} smppSessionId:{} fromName:{} tpdu:{} | rds:{} tpDcs:{}",
+                         fwsmiCall.getSmppServiceType(), fwsmiCall.getSmppScheduleDeliveryTime(), fwsmiCall.getSmppReplaceIfPresentFlag(),
+                         fwsmiCall.getSmppGwId(), fwsmiCall.getSmppSessionId(), fwsmiCall.getFromName(), fwsmiCall.getTpdu(), registeredDelivery,
+                         tpDcs.getCharSet());
+        }
         // dispatch sync message
         Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
         if (ret == null) {
@@ -188,12 +225,14 @@ public class SmscSubmitSmDialog extends Dialog {
         }
         // set assigned message id
         setDialogId(fwsmiRet.getMessageId());
-        // TODO debug
-        System.out.println("dispatch fwsmiCall ok. messageId:" + fwsmiRet.getMessageId() + " rds=" + registeredDelivery);
+        // Register and init new dialog
+        long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, submitSmPdu.getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
+        dialogService.putDialog(this, tmpValidityPeriod > 0 ? tmpValidityPeriod : cfg.getDefaultValidityPeriod());
+        logger.info("Created Dialog. dialogId:{} rds:{}", dialogId, registeredDelivery);
         // if OK send sumbit_sm_resp
         DefaultResponseOKEvent rok = new DefaultResponseOKEvent(submitSmPdu);
         smppMsgId = ((SubmitSMResp)rok.getResponse()).getMessageId();
-        gwProcessor.offerSmppEvent(rok);
+        gwProcessor.getSmppProcessor(processorId).offerSmppEvent(rok);
         state = DialogState.forward;
         // If registered delivery is disable, close transaction
         if (!registeredDelivery) {
@@ -204,14 +243,9 @@ public class SmscSubmitSmDialog extends Dialog {
             invalidate();
         }
     }
-
-    /**
-     * {@inheritDoc}
-     */
+    
     @Override
     public void handleMcMessage(McMessage msg) {
-        // TODO debug
-        System.out.println("+-+-+-+-+-+-+-+-+-+-+-");
         try {
             // create fwsmo call
             ForwardSmOCall fwsmoCall = (ForwardSmOCall) msg;
@@ -234,7 +268,7 @@ public class SmscSubmitSmDialog extends Dialog {
             // set delivery Ack
             deliverSmEv.setDeliveryAck(esmClass.getDeliveryAck());
             // dispatch deliver_sm confirmation
-            gwProcessor.offerSmppEvent(deliverSmEv);
+            gwProcessor.getSmppProcessor(processorId).offerSmppEvent(deliverSmEv);
             state = DialogState.awaiting_0;
         } catch (Throwable ex) {
             logger.warn("Failed to handle McMessage...", ex);
@@ -243,25 +277,27 @@ public class SmscSubmitSmDialog extends Dialog {
             invalidate();
         }
     }
-
-    /**
-     * {@inheritDoc}
-     */
+    
     @Override
     public void execute() {
+        logger.info("Execute Dialog. dialogId:{} rds:{} state:{}", dialogId, registeredDelivery, state);
         if (registeredDelivery) {
             // notify ForwardSmORetasync
             ForwardSmORetAsyncCall fwsmoRet = new ForwardSmORetAsyncCall(fwsmoCallMsgId, ret, this.commandStatusCode);
+            logger.debug("ForwardSmORetAsyncCall messageId:{} ret:{} serviceMsg:{}", fwsmoRet.getMessageId(), fwsmoRet.getRet(), fwsmoRet.getServiceMsg());
             mcDispatcher.dispatch(fwsmoRet);
             logger.debug("Dispatch ForwardSmORetAsyncCall messageId:{} ret:{} commandStatusCode:{}", fwsmoCallMsgId, ret, commandStatusCode);;
         }
     }
-
-    /**
-     * {@inheritDoc}
-     */
+    
     @Override
     public DialogType getType() {
         return DialogType.smsc_submit;
+    }
+    
+    @Override
+    protected void invalidate() {
+        logger.info("Invalidate Dialog. dialogId:{} rds:{} state:{}", dialogId, registeredDelivery, state);
+        super.invalidate();
     }
 }

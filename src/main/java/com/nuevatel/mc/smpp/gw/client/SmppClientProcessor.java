@@ -1,17 +1,12 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package com.nuevatel.mc.smpp.gw.client;
 
 import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
-import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.Constants;
-import com.nuevatel.mc.smpp.gw.SmppDateUtil;
+import com.nuevatel.mc.smpp.gw.SmppProcessor;
+import com.nuevatel.mc.smpp.gw.ThrotlleCounter;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
-import com.nuevatel.mc.smpp.gw.dialog.DialogService;
 import com.nuevatel.mc.smpp.gw.dialog.client.EsmeDeliverSmDialog;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 import com.nuevatel.mc.smpp.gw.event.CancelSmEvent;
@@ -26,18 +21,13 @@ import com.nuevatel.mc.smpp.gw.event.SubmitSmppEvent;
 import com.nuevatel.mc.smpp.gw.exception.FailedBindOperationException;
 
 import java.io.IOException;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.smpp.Data;
 import org.smpp.ServerPDUEvent;
-import org.smpp.ServerPDUEventListener;
 import org.smpp.Session;
-import org.smpp.SmppObject;
 import org.smpp.TCPIPConnection;
 import org.smpp.TimeoutException;
 import org.smpp.WrongSessionStateException;
@@ -54,6 +44,7 @@ import org.smpp.pdu.PDU;
 import org.smpp.pdu.PDUException;
 import org.smpp.pdu.QuerySM;
 import org.smpp.pdu.ReplaceSM;
+import org.smpp.pdu.Request;
 import org.smpp.pdu.SubmitSM;
 import org.smpp.pdu.UnbindResp;
 import org.smpp.pdu.ValueNotSetException;
@@ -64,68 +55,55 @@ import org.smpp.util.TerminatingZeroNotFoundException;
 import static com.nuevatel.common.util.Util.*;
 
 /**
- * Handle all acction on SMPP client.
  * 
- * @author asalazar
+ * <p>The SmppClientProcessor class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Implements logic for the SMPP client.
+ * 
+ * @author Ariel Salazar
+ * @version 1.0
+ * @since 1.8
  */
-public class SmppClientProcessor {
+public class SmppClientProcessor extends SmppProcessor {
     
     private static Logger logger = LogManager.getLogger(SmppClientProcessor.class);
     
-    /**
-     * To receive sync response
+    /* Private variables */
+    
+    /*
+     * Smpp session between client and external SMSC
      */
-    private static final int RECIEVE_TIMEOUT = 20000;
-    
-    private static long defaultValidityPeriod = AllocatorService.getConfig().getDefaultValidityPeriod();
-    
-    /**
-     * All incoming events from the SMSC (SMPP server)
-     */
-    private BlockingQueue<ServerPDUEvent>serverPduEvents;
-    
-    /**
-     * All outgoing events. Messages to submit to remote SMSC (SMPP server)
-     */
-    private BlockingQueue<SmppEvent>smppEvents;
-    
-    /**
-     * This is an instance of listener which obtains all PDUs received from the SMSC.
-     * Application doesn't have explicitly call Session's receive() function,
-     * all PDUs are passed to this application callback object.
-     * See documentation in Session, Receiver and ServerPDUEventListener classes
-     * form the SMPP library.
-     * 
-     * Its is instantiated in bind()
-     */
-    private ServerPDUEventListener pduListener = null;
-    
-    private SmppGwSession gwSession;
-    
     private Session smppSession = null;
 
     private AddressRange addressRange = new AddressRange();
     
-    private DialogService dialogService = AllocatorService.getDialogService();
-    
     private boolean running = false;
     
+    private ThrotlleCounter throtlleCounter; 
+    
+    /**
+     * Creates an instance of <code>SmppClientProcessor</code>, from <code>SmppGwSession</code> and <code>ThrotlleCounter</code> service.
+     * 
+     * @param gwSession
+     * @param throtlleCounter
+     */
     public SmppClientProcessor(SmppGwSession gwSession,
-                             BlockingQueue<ServerPDUEvent>serverPduEvents, 
-                             BlockingQueue<SmppEvent>smppEvents) {
+                               ThrotlleCounter throtlleCounter) {
+        super(gwSession);
+        
         Parameters.checkNull(gwSession, "gwSession");
-        Parameters.checkNull(smppEvents, "smppEvents");
-        Parameters.checkNull(smppEvents, "mcEvents");
         
         this.gwSession = gwSession;
-        this.serverPduEvents = serverPduEvents;
-        this.smppEvents = smppEvents;
+        this.throtlleCounter = throtlleCounter;
     }
     
     /**
+     * <code>true</code> if client is bound.
      * 
-     * @return <code>true</code> if client is bound.
+     * @return 
      */
+    @Override
     public boolean isBound() {
         return smppSession == null ? false : (smppSession.isBound() && smppSession.getConnection().isOpened());
     }
@@ -145,18 +123,14 @@ public class SmppClientProcessor {
                               PDUException,
                               WrongSessionStateException,
                               IOException {
-        if (!running) {
-            // Start processor thread
-            running = true;
-        }
-        
-        if (isBound()) {
-            logger.warn("Already bound, unbind first. SmppSessionId=" + gwSession.getSmppSessionId());
-        }
+        // Start processor thread
+        if (!running) running = true;
+        // already bound
+        if (isBound()) logger.warn("Already bound, unbind first. SmppSessionId=" + gwSession.getSmppSessionId());
         // Do bind op
         BindRequest request = getBindRequest(gwSession.getBindType());
         TCPIPConnection conn = new TCPIPConnection(gwSession.getSmscAddress(), gwSession.getSmscPort());
-        conn.setReceiveTimeout(RECIEVE_TIMEOUT);
+        conn.setReceiveTimeout(Constants.TCPIP_CONN_RECIEVE_TIMEOUT);
         smppSession = new Session(conn);
         // set up request
         request.setSystemId(gwSession.getSystemId());
@@ -164,16 +138,15 @@ public class SmppClientProcessor {
         request.setSystemType(gwSession.getSystemType());
         request.setInterfaceVersion((byte)0x34);
         request.setAddressRange(addressRange);
-        // send bind req
-        pduListener = new SmppClientEventListener(serverPduEvents, smppSession);
         // do bind and register listener in the session
-        BindResponse response = smppSession.bind(request, pduListener);
+        BindResponse response = smppSession.bind(request, (pduEvent) -> handleServerPDUEvent(pduEvent));
         // Log response
         logger.info("Bind response: " + response.debugString());
         // Check if was succedded
         if (isBound()) {
             logger.info("bind succedded");
-        } else {
+        }
+        else {
             logger.error("bind failed. commandStatus:{} bindResponse:", response.getCommandStatus(), response.debugString());
             throw new FailedBindOperationException(response);
         }
@@ -188,9 +161,7 @@ public class SmppClientProcessor {
             return;
         }
         // send requests
-        if (smppSession.getReceiver().isReceiver()) {
-            logger.warn("It can take a while to stop the receiver. SmppSessionId=" + gwSession.getSmppSessionId());
-        }
+        if (smppSession.getReceiver().isReceiver()) logger.warn("It can take a while to stop the receiver. SmppSessionId=" + gwSession.getSmppSessionId());
         UnbindResp response = null;
         try {
             response = smppSession.unbind();
@@ -200,18 +171,14 @@ public class SmppClientProcessor {
         logger.info("Unbind response: " + "Unbind response: " + response == null? null : response.debugString());
     }
     
-    /**
-     * Receive smpp messages from remote SMSC and consume the PDU.
-     */
+    @Override
     public void receive() {
         logger.info("client.recieve...");
         try {
             while (isRunning()) {
                 try {
                     if (!isBound()) {
-                        if (logger.isTraceEnabled()) {
-                            logger.trace("manager.receive()  Await until bound...");
-                        }
+                        if (logger.isTraceEnabled()) logger.trace("manager.receive()  Await until bound...");
                         // Await until bound
                         Thread.sleep(500L);
                         continue;
@@ -223,6 +190,7 @@ public class SmppClientProcessor {
                         logger.trace("No events to process for smppGwId:{}", gwSession.getSmppGwId());
                         continue;
                     }
+                    
                     PDU pdu = smppEvent.getPDU();
                     if (pdu != null) {
                         // Find dialog to dispatch message to handle it, if it does not exists create new dialog for incoming messages.
@@ -230,22 +198,35 @@ public class SmppClientProcessor {
                         Long dialogId = findDialogId(pdu);
                         if (dialogId != null && (dialog = dialogService.getDialog(dialogId)) != null) {
                             // Handle event by dialog
+                            logger.trace("Found dialog for dialogId:{}", dialogId);
                             dialog.handleSmppEvent(smppEvent);
-                        } else {
-                            // Create dialog
+                        }
+                        else {
+                            // validate throttle limit
                             if (Data.DELIVER_SM == pdu.getCommandId()) {
-                                // Create new dialog for deliver sm
-                                // TODO
-                                System.out.println("******* " + pdu.debugString() + " time " + ZonedDateTime.now().toString());
+                                if (throtlleCounter.exceededLimit(gwSession.getThrottleLimit())) {
+                                    // if limit is exceeded, reject request
+                                    GenericResponseEvent resp = new GenericResponseEvent(((Request)pdu).getResponse(), Data.ESME_RTHROTTLED);
+                                    offerSmppEvent(resp);
+                                    continue;
+                                }
+                                // Check regexp
+                                if (!checkSourceAddr(((DeliverSM)pdu).getSourceAddr().getAddress())) {
+                                    // if not match with regexp
+                                    GenericResponseEvent resp = new GenericResponseEvent(((Request) pdu).getResponse(), Data.ESME_RINVSRCADR);
+                                    offerSmppEvent(resp);
+                                    continue;
+                                }
+                                // Create dialog
                                 // SmppSessionId is the processor identifier.
-                                Dialog deliverSmDialog = new EsmeDeliverSmDialog(gwSession.getSmppSessionId()); // Id to identify the processor
+                                Dialog deliverSmDialog = new EsmeDeliverSmDialog(gwSession.getSmppSessionId(),  // Id to identify the processor
+                                                                                getSmppProcessorId());
                                 // Initialize dialog
                                 deliverSmDialog.init();
                                 deliverSmDialog.handleSmppEvent(smppEvent);
-                                // Register dialog (mc assing message id)
-                                ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
-                                long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, ((DeliverSM)pdu).getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
-                                dialogService.putDialog(deliverSmDialog, tmpValidityPeriod > 0 ? tmpValidityPeriod : defaultValidityPeriod);
+                                logger.trace("Not found EsmeDeliverSmDialog. Created new dialog for dialogId:{}", deliverSmDialog.getDialogId());
+                                // message was accepted to deliver
+                                throtlleCounter.inc();
                             } else {
                                 // unknow / unsupported smpp message
                                 if (pdu.isRequest()) {
@@ -253,7 +234,8 @@ public class SmppClientProcessor {
                                     GenericNAckEvent nackEv = new GenericNAckEvent(pdu.getSequenceNumber(), Data.ESME_RINVCMDID);
                                     // Schedule to dispatch.
                                     offerSmppEvent(nackEv);
-                                } else {
+                                }
+                                else {
                                     // For a response ignore it. do nothing.
                                 }
                             }
@@ -272,29 +254,13 @@ public class SmppClientProcessor {
         if (pdu.isRequest() && Data.DELIVER_SM == pdu.getCommandId()) {
             DeliverSM deliverSM = (DeliverSM) pdu;
             // check if deliver sm contains ack
-            if ((deliverSM.getEsmClass() & Data.SM_ESME_DLV_ACK_TYPE) == Data.SM_ESME_DLV_ACK_TYPE) {
-                return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
-            }
+            if ((deliverSM.getEsmClass() & Data.SM_ESME_DLV_ACK_TYPE) == Data.SM_ESME_DLV_ACK_TYPE) return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
             // other case deliver will originate dialog
             return null;
-        } else if (pdu.isResponse()) {
-            return dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
         }
+        else if (pdu.isResponse()) return dialogService.findDialogIdBySequenceNumber(pdu.getSequenceNumber());
         // dialog not found
         return null;
-    }
-    
-    /**
-     * TODO remove int
-     * 
-     * Schedule a single event for delivering to remote SMSC;
-     * 
-     * @param event Event to dispatch
-     * @return 0 -> event was schedule to dispatch. 1 -> Sender is not allowed to dispatch
-     * @throws InterruptedException 
-     */
-    public boolean offerSmppEvent(SmppEvent event) throws InterruptedException {
-        return smppEvents.offer(event, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS);
     }
     
     public void enquireLink() throws ValueNotSetException, // do enquireLink
@@ -310,9 +276,7 @@ public class SmppClientProcessor {
             logger.warn("smppGwId:{} is not bound...", gwSession.getSmppGwId());
         } catch (IOException ex) {
             logger.warn("Enquirelink failed...");
-            if (logger.isTraceEnabled()) {
-                logger.warn("Exception:", ex);
-            }
+            if (logger.isTraceEnabled()) logger.warn("Exception:", ex);
         }
     }
 
@@ -320,33 +284,28 @@ public class SmppClientProcessor {
      * Receive messages from local MC and dispatch it to remote SMSC
      * 
      */
+    @Override
     public void dispatch() {
         try {
             SmppEvent smppEvent = null;
             while (isRunning()) {
                 try {
                     if (!isBound()) {
-                        if (logger.isTraceEnabled()) {
-                            logger.trace("manager.dispatch() Await until bound...");
-                        }
+                        if (logger.isTraceEnabled()) logger.trace("manager.dispatch() Await until bound...");
                         // Await until bound
                         Thread.sleep(500L);
                         continue;
                     }
                     // get scheduled event
                     smppEvent = smppEvents.poll(Constants.TIMEOUT_POLL_EVENT_QUEUE, TimeUnit.MILLISECONDS);
-                    if (smppEvent == null) {
-                        // timeout
-                        continue;
-                    }
+                    // timeout
+                    if (smppEvent == null) continue;
                     // dispatch to remote SMSC
                     dispatchEvent(smppEvent);
                     logger.trace("client.dispatch[{}]...", smppEvent.toString());
                 } catch (TimeoutException | PDUException | WrongSessionStateException | IOException | NotEnoughDataInByteBufferException | TerminatingZeroNotFoundException ex) {
                     logger.warn("Failed to dispatch smppEvent:{}", smppEvent == null ? null : smppEvent.toString());
-                    if (logger.isTraceEnabled()) {
-                        logger.warn("Exception:", ex);
-                    }
+                    if (logger.isTraceEnabled()) logger.warn("Exception:", ex);
                 }
             }
         } catch (Throwable ex) {
@@ -354,10 +313,16 @@ public class SmppClientProcessor {
         }
     }
     
+    /**
+     * <code>true</code> if processor is running.
+     * 
+     * @return
+     */
     public boolean isRunning() {
         return running;
     }
     
+    @Override
     public void shutdown() {
         running = false;
     }
@@ -382,37 +347,47 @@ public class SmppClientProcessor {
                                                            NotEnoughDataInByteBufferException,
                                                            TerminatingZeroNotFoundException {
         switch (smppEvent.type()) {
-        case SubmitSmEvent:
-            submitSm(castAs(SubmitSmppEvent.class, smppEvent));
-            break;
-        case DataSmEvent:
-            dataSm(castAs(DataSmEvent.class, smppEvent));
-            break;
-        case CancelSmEvent:
-            cancelSm(castAs(CancelSmEvent.class, smppEvent));
-            break;
-        case QuerySmEvent:
-            querySm(castAs(QuerySmEvent.class, smppEvent));
-            break;
-        case ReplaceSmEvent:
-            replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
-            break;
-        case GenericROkResponseEvent:
-            genericResponse(castAs(GenericResponseEvent.class, smppEvent));
-            break;
-        case DefaultROkResponseEvent:
-            defaultROkResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
-            break;
-        case GenericNAckEvent:
-            genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
-            break;
-        default:
-            logger.warn("Unknown SmppEvent...");
-            break;
+            case SubmitSmEvent:
+                submitSm(castAs(SubmitSmppEvent.class, smppEvent));
+                break;
+            case DataSmEvent:
+                dataSm(castAs(DataSmEvent.class, smppEvent));
+                break;
+            case CancelSmEvent:
+                cancelSm(castAs(CancelSmEvent.class, smppEvent));
+                break;
+            case QuerySmEvent:
+                querySm(castAs(QuerySmEvent.class, smppEvent));
+                break;
+            case ReplaceSmEvent:
+                replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
+                break;
+            case GenericROkResponseEvent:
+                genericROkResponse(castAs(GenericResponseEvent.class, smppEvent));
+                break;
+            case DefaultROkResponseEvent:
+                defaultROkResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
+                break;
+            case GenericNAckEvent:
+                genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
+                break;
+            default:
+                logger.warn("Unknown SmppEvent...");
+                break;
         }
     }
 
-    private void genericResponse(GenericResponseEvent event) throws ValueNotSetException, WrongSessionStateException, IOException {
+    /**
+     * Send Generic ROk response.
+     * 
+     * @param event
+     * @throws ValueNotSetException
+     * @throws WrongSessionStateException
+     * @throws IOException
+     */
+    private void genericROkResponse(GenericResponseEvent event) throws ValueNotSetException,
+                                                                       WrongSessionStateException,
+                                                                       IOException {
         Parameters.checkNull(event, "event");
         smppSession.respond(event.getResponse());
     }
@@ -425,7 +400,9 @@ public class SmppClientProcessor {
      * @throws WrongSessionStateException
      * @throws IOException
      */
-    private void genericNAckResponse(GenericNAckEvent event) throws ValueNotSetException, WrongSessionStateException, IOException {
+    private void genericNAckResponse(GenericNAckEvent event) throws ValueNotSetException,
+                                                                    WrongSessionStateException,
+                                                                    IOException {
         Parameters.checkNull(event, "event");
         smppSession.respond(event.getGenericNack());
     }
@@ -437,30 +414,18 @@ public class SmppClientProcessor {
      * @throws WrongSessionStateException 
      * @throws ValueNotSetException 
      */
-    private void defaultROkResponse(DefaultResponseOKEvent smResp) throws ValueNotSetException, WrongSessionStateException, IOException {
+    private void defaultROkResponse(DefaultResponseOKEvent smResp) throws ValueNotSetException, 
+                                                                          WrongSessionStateException,
+                                                                          IOException {
         Parameters.checkNull(smResp, "smResp");
         smppSession.respond(smResp.getDefaultResponse());
     }
 
     /**
-     * Assign seq number and register it on <code>smppMsgToDialogMap</code>.
-     * 
-     * @param pdu 
-     * @param dialogId 
-     */
-    private void assignSequenceNumber(PDU pdu, long dialogId) {
-        pdu.assignSequenceNumber(true);
-        if (dialogId < 0) {
-            // no map
-            return;
-        }
-        dialogService.registerSequenceNumber(pdu.getSequenceNumber(), dialogId);
-    }
-
-    /**
+     * <code>BindRequest</code> based on <code>SmppGwSession.BIND_TYPE</code>.
      * 
      * @param type
-     * @return <code>BindRequest</code> based on <code>SmppGwSession.BIND_TYPE</code>.
+     * @return 
      */
     private BindRequest getBindRequest(SmppGwSession.BIND_TYPE type) {
         switch(type) {
@@ -474,7 +439,8 @@ public class SmppClientProcessor {
     }
 
     /**
-     * Submit a single message from queue
+     * Submit a single message from queue.
+     * 
      * @throws IOException 
      * @throws WrongSessionStateException 
      * @throws PDUException 
@@ -500,9 +466,8 @@ public class SmppClientProcessor {
         request.setReplaceIfPresentFlag(event.getReplaceIfPresentFlag());
         request.setShortMessageData(new ByteBuffer(event.getData()));
         // set encoding if it is present
-        if (StringUtils.isEmptyOrNull(event.getEncoding())) {
-            request.setShortMessageEncoding(event.getEncoding());
-        }
+        if (StringUtils.isEmptyOrNull(event.getEncoding())) request.setShortMessageEncoding(event.getEncoding());
+
         request.setScheduleDeliveryTime(event.getScheduleDeliveryTime());
         request.setValidityPeriod(event.getValidityPeriod());
         request.setEsmClass(event.getEsmClass());
@@ -614,38 +579,5 @@ public class SmppClientProcessor {
         assignSequenceNumber(request, event.getMessageId());
         // send request
         smppSession.query(request);
-    }
-    
-    /**
-     * Handles all messages from remote SMPP server (remote SMSC), catch it and set in the <code>serverEvents</code> queue.
-     */
-    private static final class SmppClientEventListener extends SmppObject implements ServerPDUEventListener{
-        
-        private BlockingQueue<ServerPDUEvent> serverEvents;
-        
-        public SmppClientEventListener(BlockingQueue<ServerPDUEvent> serverEvents,
-                                       Session smppSession) {
-            this.serverEvents = serverEvents;
-        }
-        
-        /**
-         * Only offer events.
-         */
-        @Override
-        public void handleEvent(ServerPDUEvent pduEvent) {
-            if (event == null) {
-                logger.warn("Null ServerPDUEvent...");
-                return;
-            }
-            try {
-                if (!serverEvents.offer(pduEvent, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
-                    // warn the queue rejects the event
-                    logger.warn("Failed to offer serverPDUEvent:{}", pduEvent.getPDU().debugString());
-                }
-            } catch (InterruptedException ex) {
-                // On offer event
-                logger.error("On handleServerPDUEvent...", ex);
-            }
-        }
     }
 }

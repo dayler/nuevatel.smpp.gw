@@ -1,11 +1,13 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.exception;
 
 import com.nuevatel.common.exception.OperationRuntimeException;
 
 /**
+ * 
+ * <p>The InvalidSmppDateFormatException class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
  * Invalid smpp date format.<br/>
  * <br/>
  * In this interface, all time/date related fields will be in ASCII with the following format: “YYMMDDhhmmsstnnp” where <br/><br/>
@@ -27,12 +29,17 @@ import com.nuevatel.common.exception.OperationRuntimeException;
  * as above.<br/>
  * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public class InvalidSmppDateFormatException extends OperationRuntimeException {
 
     private static final long serialVersionUID = 20151204L;
 
+    /**
+     * InvalidSmppDateFormatException constructor.
+     * @param s
+     */
     public InvalidSmppDateFormatException(String s) {
         super("Date string incorrect length: " + s);
     }

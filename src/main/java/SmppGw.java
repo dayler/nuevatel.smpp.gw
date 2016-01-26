@@ -1,6 +1,6 @@
 
-import com.nuevatel.mc.common.BaseApp;
 import com.nuevatel.mc.common.GenericApp;
+import com.nuevatel.mc.common.MgmtApp;
 import com.nuevatel.mc.common.RedundantApp;
 import com.nuevatel.mc.smpp.gw.AllocatorService;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
@@ -30,16 +30,14 @@ public class SmppGw {
     /* constants for mgmt properties */
     public static final String MGMT_ID = "mgmtId";
     public static final String MGMT_WS_URL = "mgmtWsURL";
+    public static final String MGMT_UNSERNAME = "mgmtUsername";
+    public static final String MGMT_PASSWORD = "mgmtPassword";
 
     /**
-     * to shutdown kill -15 pid
+     * to shutdown <code>kill -15 pid</code>
      * 
      * The main method.
      * @param args String[]
-     * 
-     * String propVal = System.getProperty("log4j.configurationFile");
-     *  System.out.println("Log4j2: " + propVal);
-     *  logger.info("Log4j2: {}", propVal);
      * 
      */
     public static void main(String[] args) {
@@ -79,7 +77,10 @@ public class SmppGw {
                     throw new RuntimeException("illegal " + MGMT_WS_URL + " " + properties.getProperty(MGMT_WS_URL));
                 }
                 // mgmtApp
-                RedundantApp<BaseApp>mgmtApp = GenericApp.callGetMgmt(mgmtWsURL, mgmtId);
+                RedundantApp<MgmtApp>mgmtApp = GenericApp.callGetMgmt(mgmtWsURL,
+                                                                      mgmtId,
+                                                                      properties.getProperty(MGMT_UNSERNAME), // user
+                                                                      properties.getProperty(MGMT_PASSWORD)); // password
                 if (mgmtApp == null) {
                     throw new RuntimeException("illegal " + MGMT_ID + " " + properties.getProperty(MGMT_ID));
                 }

@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.mcdispatcher;
 
 import java.util.concurrent.ExecutionException;
@@ -16,15 +14,25 @@ import com.nuevatel.mc.appconn.McMessage;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 
 /**
+ * 
+ * <p>The McDispatcher class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
  * Dispatch appconn messages to MC.
  * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public class McDispatcher {
     
+    /* Private variables */
     private ExecutorService service = null;
     
+    /**
+     * Execute service.
+     * @param size
+     */
     public void execute(int size) {
         service = Executors.newFixedThreadPool(size);
     }
@@ -46,7 +54,6 @@ public class McDispatcher {
     
     /**
      * Dispatch AppConn message to MC.
-     * 
      * @param msg Message to dispatch.
      */
     public void dispatch(McMessage msg) {
@@ -64,7 +71,6 @@ public class McDispatcher {
     
     /**
      * Dispatch AppConn message and await response.
-     * 
      * @param msg Message to dispatch.
      * @return Appconn message response.
      * @throws InterruptedException

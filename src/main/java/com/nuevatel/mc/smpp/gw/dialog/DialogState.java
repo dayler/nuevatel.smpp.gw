@@ -4,10 +4,15 @@
 package com.nuevatel.mc.smpp.gw.dialog;
 
 /**
- * State for dialogs.
+ * 
+ * <p>The DialogState class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Define the possible states for a dialog.
  * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public enum DialogState {
     /**

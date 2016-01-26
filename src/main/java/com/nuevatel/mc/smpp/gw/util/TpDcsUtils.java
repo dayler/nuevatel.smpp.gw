@@ -56,4 +56,21 @@ public final class TpDcsUtils {
             return new TpDcs(StringUtils.isEmptyOrNull(smppEncoding) ? TpDcs.CS_8_BIT : TpDcs.CS_GSM7);
         }
     }
+    
+    /**
+     * Based on smppEncoding (from smpp pdu) get corresponding <code>TpDcs</code>.
+     * 
+     * @param smppEncoding smpp encoding, get it from smpp pdu.
+     * @return <code>TpDcs</code> to corresponds with smppEncoding. <b>By default return TpDcs.CS_GSM7.</b>
+     */
+    public static TpDcs resolveTpDcs(byte charSet) {
+        switch (charSet) {
+        case TpDcs.CS_GSM7:
+            return new TpDcs(TpDcs.CS_GSM7);
+        case TpDcs.CS_UCS2:
+            return new TpDcs(TpDcs.CS_UCS2);
+        default:
+            return new TpDcs(TpDcs.CS_UCS2);
+        }
+    }
 }

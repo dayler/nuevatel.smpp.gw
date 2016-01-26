@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw;
 
 import java.time.LocalDateTime;
@@ -8,17 +6,29 @@ import java.time.temporal.ChronoField;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Create new message ids.
+ * 
+ * <p>The McMessageId class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Generate random MC Id.
  * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public class McMessageId {
-    
+    /* Private variables */
     private ReentrantLock lck = new ReentrantLock();
     
     private int msgIdNumber = 0;
     
+    /**
+     * Gets new MC Message Id.
+     * 
+     * @param ldt
+     * @param mcId
+     * @return
+     */
     public long newMcMessageId(LocalDateTime ldt, int mcId) {
         long messageId = ((long) (ldt.getYear() & 0x7) << 45);
         messageId |= ((long) ldt.getMonthValue() << 41);
@@ -34,5 +44,4 @@ public class McMessageId {
         }
         return messageId;
     }
-    
 }

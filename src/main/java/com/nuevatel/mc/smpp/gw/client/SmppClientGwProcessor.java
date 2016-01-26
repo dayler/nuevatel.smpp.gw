@@ -5,8 +5,6 @@
  */
 package com.nuevatel.mc.smpp.gw.client;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -19,56 +17,54 @@ import org.smpp.WrongSessionStateException;
 import org.smpp.pdu.PDUException;
 
 import com.nuevatel.mc.smpp.gw.AllocatorService;
-import com.nuevatel.mc.smpp.gw.SmppGwApp;
 import com.nuevatel.mc.smpp.gw.SmppGwProcessor;
+import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**
+ * 
+ * <p>The SmppClientGwProcessor class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
  * Specialization for smpp client.<br/>
  * <li><code>smppEvents</code> defined on <code>SmppProcessor</code></li>
  * <li><code>mcEvents</code> defined on <code>SmppProcessor</code></li>
- *
+ * 
  * @author Ariel Salazar
+ * @version 1.0
+ * @since 1.8
  */
 public class SmppClientGwProcessor extends SmppGwProcessor {
     
     private static Logger logger = LogManager.getLogger(SmppClientGwProcessor.class);
     
-    /**
-     * One processor for each binding client.
-     */
-    private List<SmppClientProcessor>smppClientProcessorList = new ArrayList<>();
+    /* Private variables */
     
     private ExecutorService service;
     
-    private long enquireLinkPeriod;
+    private Config cfg = AllocatorService.getConfig();
     
     private ScheduledExecutorService heartbeatService = Executors.newSingleThreadScheduledExecutor();
     
     /**
      * Initialize service processor
      * 
-     * @param gwSession Session properties
+     * @param gwSession
      */
     public SmppClientGwProcessor(SmppGwSession gwSession) {
         super(gwSession);
         service = Executors.newFixedThreadPool(gwSession.getMaxBinds() * 2);
-        // enquire link
-        enquireLinkPeriod = AllocatorService.getConfig().getEnquireLinkPeriod();
     }
     
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void execute() {
         try {
             for (int i = 0; i < gwSession.getMaxBinds(); i++) {
                 try {
                     // Create one processor for connection to handle
-                    SmppClientProcessor processor = new SmppClientProcessor(gwSession, serverPduEvents, smppEvents);
+                    SmppClientProcessor processor = new SmppClientProcessor(gwSession, throtlleCounter);
                     // register smpp processor
-                    smppClientProcessorList.add(processor);
+                    registerSmppProcessor(processor);
                     // do bind
                     doBind(processor);
                     // dispatch thread
@@ -77,18 +73,17 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
                     service.execute(() -> processor.receive());
                     // health check
                     // enquire link thread
-                    if (enquireLinkPeriod > 0) {
-                        heartbeatService.scheduleAtFixedRate(() -> doEnquireLink(processor), enquireLinkPeriod, enquireLinkPeriod, TimeUnit.SECONDS);
+                    if (cfg.getEnquireLinkPeriod() > 0) {
+                        heartbeatService.scheduleAtFixedRate(() -> doEnquireLink(processor), cfg.getEnquireLinkPeriod(), cfg.getEnquireLinkPeriod(), TimeUnit.SECONDS);
                     }
                     // auto reconnect task
-                    long autoReConnectPeriod = enquireLinkPeriod > 0 ? enquireLinkPeriod : 30L; // default 30s
-                    heartbeatService.scheduleAtFixedRate(() -> tryReconnect(processor), autoReConnectPeriod, autoReConnectPeriod, TimeUnit.SECONDS);
+                    heartbeatService.scheduleAtFixedRate(() -> tryReconnect(processor), cfg.getHeartbeatPeriod(), cfg.getHeartbeatPeriod(), TimeUnit.SECONDS);
                     logger.info("SmppClientProcessor was start [index={}]...", i);
                 } catch (Throwable ex) {
                     logger.error("At index {} cannot be start SmppClientProcessor...", i, ex);
                 }
             }
-            logger.info("SmppClientGwProcessor[smppGwId{}] was started...", gwSession.getSmppGwId());
+            logger.info("SmppClientGwProcessor[smppGwId:{}] was started. {} binds was succedded...", gwSession.getSmppGwId(), countOfBoundProcessors());
         } catch (Throwable ex) {
             logger.fatal("Failed to execute SmppClientGwProcessor[smppGwId:{}]...", gwSession.getSmppGwId(), ex);
             // try shutdown
@@ -97,28 +92,27 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
     }
     
     /**
-     * Updates bind succeeded count in the mc manager.
+     * Do bind action for a single processor.
+     * 
+     * @param processor
      */
-    private void updateBindCountToMcManager() {
-        SmppGwApp.getSmppGwApp().setBound(gwSession.getSmppGwId(),
-                                          gwSession.getSmppSessionId(),
-                                          (int)smppClientProcessorList.stream().filter(p -> p.isBound()).count());
-    }
-    
     private void doBind(SmppClientProcessor processor) {
         try {
-            if (processor.isBound()) {
-                return;
-            }
+            if (processor.isBound()) return;
             // Try bind op
             processor.bind();
             // bind succeeded
-            updateBindCountToMcManager();
+            updateBindCount();
         } catch (Throwable ex) {
             logger.error("Failed to bind. SmppGwId:{} with {}:{}...", gwSession.getSmppGwId(), gwSession.getSmscAddress(), gwSession.getSmscPort(), ex);
         }
     }
     
+    /**
+     * Try to reconect with SMSC if connection was lost.
+     * 
+     * @param processor
+     */
     private void tryReconnect(SmppClientProcessor processor) {
         if (!processor.isBound()) {
             // try to reconnect.
@@ -127,24 +121,25 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
                 processor.unbind();
             } catch (Throwable ex) {
                 logger.warn("On reconnection task, failed un unbind...");
-                if (logger.isTraceEnabled()) {
-                    logger.warn("Exception:", ex);
-                }
+                if (logger.isTraceEnabled()) logger.warn("Exception:", ex);
             }
             // try bind
             try {
                 processor.bind();
                 // bind succeeded
-                updateBindCountToMcManager();
+                updateBindCount();
             } catch (Throwable ex) {
                 logger.warn("On reconnection task, failed bind. SmppGwId:{} with {}:{}...", gwSession.getSmppGwId(), gwSession.getSmscAddress(), gwSession.getSmscPort());
-                if (logger.isTraceEnabled()) {
-                    logger.warn("Exception:", ex);
-                }
+                if (logger.isTraceEnabled()) logger.warn("Exception:", ex);
             }
         }
     }
     
+    /**
+     * Do enquire link.
+     * 
+     * @param clientProcessor
+     */
     private void doEnquireLink(SmppClientProcessor clientProcessor) {
         try {
             clientProcessor.enquireLink();
@@ -154,17 +149,13 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
         }
     }
     
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void shutdown(int ts) {
         try {
-            smppClientProcessorList.stream().forEach(processor -> {
-                if (processor.isBound()) {
-                    // unbind
-                    processor.unbind();
-                }
+            super.shutdown(ts);
+            getSmppProcessorMap().values().stream().map(p -> (SmppClientProcessor) p).forEach(processor -> {
+                // unbind
+                if (processor.isBound()) processor.unbind();
             });
             // stop enquirelink service
             if (heartbeatService != null) {
@@ -172,7 +163,7 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
                 heartbeatService.awaitTermination(60, TimeUnit.SECONDS);
             }
             // Update unbind operation on manager
-            updateBindCountToMcManager();
+            updateBindCount();
             // stop executor service
             service.shutdown();
             service.awaitTermination(ts, TimeUnit.SECONDS);

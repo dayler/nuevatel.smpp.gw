@@ -70,7 +70,7 @@ public class SmppDateUtilTest {
     public void parseDateTimeRelative() {
         Period period = Period.of(2, 6, 10);
         Duration duration = Duration.ofHours(23).plusMinutes(34).plusSeconds(29);
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime abstime = now.plus(period).plus(duration);
         ZonedDateTime testAbsTime = SmppDateUtil.parseDateTime(now, TEST_STR_RELATIVE_TIME);
         assertNotNull("ZonedDateTime is null", testAbsTime);
@@ -79,8 +79,8 @@ public class SmppDateUtilTest {
     
     @Test
     public void parseDateTimeAbsolute() {
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
-        ZonedDateTime abstime = ZonedDateTime.of(2011, 6, 15, 02, 26, 48, 0, ZoneId.of("UTC"));
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+        ZonedDateTime abstime = ZonedDateTime.of(2011, 6, 15, 02, 26, 48, 0, ZoneId.systemDefault());
         ZonedDateTime testAbsTime = SmppDateUtil.parseDateTime(now, TEST_STR_ABSOLUTE_TIME);
         assertNotNull("ZonedDateTime is null", testAbsTime);
         assertTrue("not same time", abstime.isEqual(testAbsTime));
@@ -88,7 +88,7 @@ public class SmppDateUtilTest {
     
     @Test
     public void toSmppDatetimeAbsolute() {
-        ZonedDateTime abstime = ZonedDateTime.of(2011, 6, 15, 02, 26, 48, 0, ZoneId.of("UTC"));
+        ZonedDateTime abstime = ZonedDateTime.of(2011, 6, 15, 02, 26, 48, 0, ZoneId.systemDefault());
         String formattedDate = SmppDateUtil.toSmppDatetime(abstime);
         assertNotNull("null formatted date", formattedDate);
         assertEquals("not same time", TEST_STR_ABSOLUTE_TIME, formattedDate);

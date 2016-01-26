@@ -25,13 +25,14 @@ import com.nuevatel.mc.tpdu.SmsDeliver;
 import com.nuevatel.mc.tpdu.SmsSubmit;
 
 /**
- * <p>The ForwardSmOTask class.</p> Handles <code>ForwardSmOCall</code> appconn message.This kind of message is received when is delivered a short
- * message from local SMSC(MC) to remote SMSC.
- * <br/>
  * 
- * <p>Nuevatel PCS de Bolivia S.A. (c) 2015</p>
- *
- * @author Ariel Salazar, Jorge Vasquez, Eduardo Marin
+ * <p>The ForwardSmOTask class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Handles <code>ForwardSmOCall</code> appconn message.This kind of message is received when is delivered a short
+ * message from local SMSC(MC) to remote SMSC.
+ * 
+ * @author Ariel Salazar
  * @version 1.0
  * @since 1.8
  */
@@ -58,10 +59,10 @@ public class ForwardSmOTask implements Task {
             LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
             ForwardSmOCall fwsmoCall = new ForwardSmOCall(msg);
             // try to in dialog to handle it.
-            // TODO debug
-            System.out.println("***** fwsmoCall.getMessageId() " + fwsmoCall.getMessageId() + " fwsmoCall.getSmMessageId() " + fwsmoCall.getSmMessageId() );
+            logger.debug("ForwardSmOCall messageId:{} smMessageId:{}", fwsmoCall.getMessageId(), fwsmoCall.getSmMessageId());
             Dialog dialog = dialogService.getDialog(fwsmoCall.getSmMessageId());
             if (dialog != null) {
+                logger.trace("Found dialog for dialogId:{}", fwsmoCall.getSmMessageId());
                 // find dialog
                 dialog.handleMcMessage(fwsmoCall);
                 return new ForwardSmORet(AppMessages.ACCEPTED).toMessage();
@@ -73,8 +74,10 @@ public class ForwardSmOTask implements Task {
                 SmsSubmit smsSubmit = new SmsSubmit(fwsmoCall.getTpdu(), now);
                 EsmeSubmitSmDialog esmeSubmitDialog = new EsmeSubmitSmDialog(// dialogId
                                                                              fwsmoCall.getMessageId(),
-                                                                             // processorId
+                                                                             // gwProcessorId
                                                                              fwsmoCall.getSmppSessionId(),
+                                                                             // processorId
+                                                                             AllocatorService.getSmppGwProcessor(fwsmoCall.getSmppSessionId()).nextSmppProcessorId(),
                                                                              // smMessageId
                                                                              fwsmoCall.getSmMessageId() == null ? 0 : fwsmoCall.getSmMessageId(),
                                                                              // registeredDelivery
@@ -86,14 +89,17 @@ public class ForwardSmOTask implements Task {
                                                                              smsSubmit);
                 dialogService.putDialog(esmeSubmitDialog, ValidityPeriod.resolveExpireAfterWriteTime(smsSubmit.getTpVp(), cfg.getDefaultValidityPeriod(), now));
                 esmeSubmitDialog.init();
+                logger.trace("Not found EsmeSubmitSmDialog. Created new dialog for dialogId:{}", esmeSubmitDialog.getDialogId());
                 return new ForwardSmORet(AppMessages.ACCEPTED).toMessage();
             } else if (SmppGwSession.SMPP_TYPE.SMSC.equals(gwSession.getSmppType())) {
                 // smsc deliver_sm
                 SmsDeliver smsDeliver = new SmsDeliver(fwsmoCall.getTpdu());
                 SmscDeliverSmDialog smscDeliverDialog = new SmscDeliverSmDialog(// dialogId
                                                                                 fwsmoCall.getMessageId(),
-                                                                                // processorId
+                                                                                // gwProcessorId
                                                                                 fwsmoCall.getSmppSessionId(),
+                                                                                // processorId
+                                                                                AllocatorService.getSmppGwProcessor(fwsmoCall.getSmppSessionId()).nextSmppProcessorId(),
                                                                                 // smMessageId
                                                                                 fwsmoCall.getSmMessageId(),
                                                                                 // fromName
@@ -103,6 +109,7 @@ public class ForwardSmOTask implements Task {
                                                                                 smsDeliver);
                 dialogService.putDialog(smscDeliverDialog, cfg.getDefaultValidityPeriod());
                 smscDeliverDialog.init();
+                logger.trace("Not found SmscDeliverSmDialog. Created new dialog for dialogId:{}", smscDeliverDialog.getDialogId());
                 return new ForwardSmORet(AppMessages.ACCEPTED).toMessage();
             } else {
                 // No op

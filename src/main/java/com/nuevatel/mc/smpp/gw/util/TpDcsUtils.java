@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.util;
 
 import com.nuevatel.common.util.StringUtils;
@@ -8,19 +6,28 @@ import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.tpdu.TpDcs;
 
 /**
+ * 
+ * <p>The TpDcsUtils class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * General purpose utilities for TpDcs.
+ * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public final class TpDcsUtils {
-    
+    /**
+     * To prevent instantiation.
+     */
     private TpDcsUtils() {
         // No op.
     }
     
     /**
-     * 
+     * Get smpp string representation.
      * @param charSet
-     * @return From TpDcs get smpp string representaion.
+     * @return From TpDcs 
      */
     public static String resolveSmppEncoding(byte charSet) {
         switch (charSet) {
@@ -36,10 +43,11 @@ public final class TpDcsUtils {
     }
     
     /**
-     * Based on smppEncoding (from smpp pdu) get corresponding <code>TpDcs</code>.
+     * Based on smppEncoding (from smpp pdu) get corresponding <code>TpDcs</code>. <code>TpDcs</code> to corresponds with smppEncoding. <b>By default
+     * return TpDcs.CS_GSM7.</b>
      * 
-     * @param smppEncoding smpp encoding, get it from smpp pdu.
-     * @return <code>TpDcs</code> to corresponds with smppEncoding. <b>By default return TpDcs.CS_GSM7.</b>
+     * @param smppEncoding 
+     * @return 
      */
     public static TpDcs resolveTpDcs(String smppEncoding) {
         if (StringUtils.isEmptyOrNull(smppEncoding)) {
@@ -58,10 +66,11 @@ public final class TpDcsUtils {
     }
     
     /**
-     * Based on smppEncoding (from smpp pdu) get corresponding <code>TpDcs</code>.
+     * Based on smppEncoding (from smpp pdu) get corresponding <code>TpDcs</code>. <code>TpDcs</code> to corresponds with smppEncoding. <b>By default
+     * return TpDcs.CS_GSM7</b>.
      * 
-     * @param smppEncoding smpp encoding, get it from smpp pdu.
-     * @return <code>TpDcs</code> to corresponds with smppEncoding. <b>By default return TpDcs.CS_GSM7.</b>
+     * @param smppEncoding
+     * @return 
      */
     public static TpDcs resolveTpDcs(byte charSet) {
         switch (charSet) {

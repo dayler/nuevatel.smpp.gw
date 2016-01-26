@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.util;
 
 import org.smpp.Data;
@@ -8,15 +6,40 @@ import org.smpp.Data;
 import com.nuevatel.mc.tpdu.Tpdu;
 
 /**
+ * 
+ * <p>The TpStatusResolver class.</p>
+ * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
+ * 
+ * Get SMPP command status from Tp-Status.<br/>
+ * Get Tp-Status from SMPP command status.
+ * 
  * @author Ariel Salazar
- *
+ * @version 1.0
+ * @since 1.8
  */
 public final class TpStatusResolver {
     
+    /**
+     * Prevent instantiation.
+     */
+    private TpStatusResolver() {
+        // No op.
+    }
+    
+    /**
+     * From smppCommandId get Tp-Status.
+     * @param smppCmdId
+     * @return
+     */
     public static byte resolveTpStatus(int smppCmdId) {
         return TpStatus.fromSmppCommandId(smppCmdId).getTpStatus();
     }
     
+    /**
+     * From Tp-Status get smppCommandId.
+     * @param tpStatus
+     * @return
+     */
     public static int resolveSmppCommandStatus(byte tpStatus) {
         // TP_ST_TEMPORARY_ERROR_0, TP_ST_TEMPORARY_ERROR_1
         // public static final byte TP_ST_CONGESTION = 0x0;                // Congestion
@@ -38,6 +61,9 @@ public final class TpStatusResolver {
         return SmppCommandStatus.fromTpStatus(tpStatus).getStatus();
     }
     
+    /**
+     * Enum for Tp-Status.
+     */
     private enum TpStatus {
         // Short message received by the SME
         TP_ST_SM_RECEIVED_BY_SME(0x0) {
@@ -118,18 +144,35 @@ public final class TpStatusResolver {
         
         private byte tpStatus;
         
+        /**
+         * TpStatus constructor.
+         * @param tpStatus
+         */
         private TpStatus(int tpStatus) {
             this.tpStatus = (byte)tpStatus;
         }
         
+        /**
+         * Get tpStatus.
+         */
         public byte getTpStatus() {
             return tpStatus;
         }
         
+        /**
+         * Indicates if smppCmdId match with enum.
+         * @param smppCmdId
+         * @return
+         */
         protected boolean matchWith(int smppCmdId) {
             return false;
         }
         
+        /**
+         * TpStatus from smpp command id.
+         * @param smppCmdId
+         * @return
+         */
         public static TpStatus fromSmppCommandId(int smppCmdId) {
             for (TpStatus ts : values()) {
                 if (ts.matchWith(smppCmdId)) {
@@ -281,24 +324,47 @@ public final class TpStatusResolver {
         private int cmdStatus;
         private String description;
         
+        /**
+         * SmppCommandStatus constructor.
+         * @param cmdStatus
+         * @param description
+         */
         private SmppCommandStatus(int cmdStatus, String description) {
             this.cmdStatus = cmdStatus;
             this.description = description;
         }
         
+        /**
+         * Get cmdStatus.
+         * @return
+         */
         public int getStatus() {
             return cmdStatus;
         }
         
+        /**
+         * Get description.
+         * @return
+         */
         @SuppressWarnings("unused")
         public String getDescription() {
             return description;
         }
         
+        /**
+         * Indicate if tpStatus match with enum.
+         * @param tpStatus
+         * @return
+         */
         protected boolean matchWith(byte tpStatus) {
             return false;
         }
         
+        /**
+         * Get SmppCommandStatus from tpStatus.
+         * @param tpStatus
+         * @return
+         */
         public static SmppCommandStatus fromTpStatus(byte tpStatus) {
             for (SmppCommandStatus cs : values()) {
                 if (cs.matchWith(tpStatus)) {

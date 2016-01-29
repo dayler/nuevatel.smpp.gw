@@ -81,9 +81,7 @@ public class SmppGwApp extends GenericApp {
             // updateState
             setState(STATE.ONLINE);
             BaseApp mgmtApp = getMgmt().getApp();
-            if (mgmtApp != null) {
-                callUpdateState(mgmtApp.getWsURL(), getAppId(), getAppId(), getState());
-            }
+            if (mgmtApp != null) callUpdateState(mgmtApp.getWsURL(), getAppId(), getAppId(), getState());
             logger.info("start", "smppGwId " + getAppId() + " state " + getState().getName());
             // Register hook
             Runtime.getRuntime().addShutdownHook(hook);
@@ -220,7 +218,9 @@ public class SmppGwApp extends GenericApp {
                             smppGwSessionMap.put(session.getSmppSessionId(), session);
                             });
             }
-            else throw new RuntimeException("invalid ret for " + WS_METHOD.GET_SMPP_GW_PROPERTIES_LIST.getName());
+            else {
+                throw  new RuntimeException("invalid ret for " + WS_METHOD.GET_SMPP_GW_PROPERTIES_LIST.getName());
+            }
 
             // wsServerProperties
             wsServerProperties = callGetProperties(mgmtApp.getWsURL(), WS_METHOD.GET_WS_SERVER_PROPERTIES, new IntIe(WS_IE.APP_ID.getName(), getAppId()));
@@ -239,7 +239,9 @@ public class SmppGwApp extends GenericApp {
                                          new AppClient(getAppId(), proxyId, appClientTaskSet, callGetProperties(mgmtApp.getWsURL(), WS_METHOD.GET_APP_CLIENT_PROPERTIES, new IntIe(WS_IE.FROM_APP_ID.getName(), getAppId()), new IntIe(WS_IE.APP_ID.getName(), proxyId)))));
                 }
             }
-            else throw new RuntimeException("invalid ret for " + WS_METHOD.GET_GMAP_GW_APP_LIST.getName());
+            else {
+                throw new RuntimeException("invalid ret for " + WS_METHOD.GET_GMAP_GW_APP_LIST.getName());
+            }
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -253,10 +255,8 @@ public class SmppGwApp extends GenericApp {
      * @return ServerGwProcessor
      */
     private SmppGwProcessor makeGwProcessor(SmppGwSession.SMPP_TYPE smppType, SmppGwSession gwSession) {
-        if (SmppGwSession.SMPP_TYPE.SMSC.equals(smppType)) {
-            // Server
-            return new SmppServerGwProcessor(gwSession);
-        }
+        // Server
+        if (SmppGwSession.SMPP_TYPE.SMSC.equals(smppType)) return new SmppServerGwProcessor(gwSession);
         // Client
         return new SmppClientGwProcessor(gwSession);
     }

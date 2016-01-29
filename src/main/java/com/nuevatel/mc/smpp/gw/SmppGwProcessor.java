@@ -29,7 +29,7 @@ public abstract class SmppGwProcessor implements Processor {
     /* Protected variables */
     protected SmppGwSession gwSession;
     
-    /*
+    /**
      * Used to generate random SmppProcessor id.
      */
     private UniqueID idGen;
@@ -37,19 +37,18 @@ public abstract class SmppGwProcessor implements Processor {
     protected ThrotlleCounter throtlleCounter = new ThrotlleCounter();
     
     /* Private variables */
-    /*
+    /**
      * One processor for each binding client.
      */
     private Map<Integer, SmppProcessor>smppProcessorMap = new HashMap<>();
     
-    /*
+    /**
      * Iterator index.
      */
     private Integer itIdx = 0;
     
     /**
      * Constructor for <code>SmppGwProcessor</code>, assign the <code>SmppGwSession</code> to the processor.
-     * 
      * @param gwSession
      */
     public SmppGwProcessor(SmppGwSession gwSession) {
@@ -67,7 +66,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Gets smpp processor to corresponds with <code>smppProcessorId</code>.
-     * 
      * @param smppProcessorId
      * @return
      */
@@ -78,15 +76,12 @@ public abstract class SmppGwProcessor implements Processor {
     /**
      * Selected <code>SmppProcessor</code>. Pick up a smpp processor, to handle an operation. <code>null</code> if there no have a registered
      * smpp processor, or an exception occurs when is selecting the proecssor.
-     * 
      * @return 
      */
     @SuppressWarnings("unchecked")
     public synchronized Integer nextSmppProcessorId() {
-        if (smppProcessorMap.isEmpty()) {
-            // empty list
-            return null;
-        }
+        // empty list
+        if (smppProcessorMap.isEmpty()) return null;
         Map.Entry<Integer, SmppProcessor>entry = null;
         try {
             // Select processor index
@@ -111,7 +106,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Gets current it index.
-     * 
      * @return
      */
     public Integer getCurrentItIdx() {
@@ -136,7 +130,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Register the <code>SmppProcessor</code> and assign a unique id.
-     * 
      * @param processor
      * @throws OperationException
      */
@@ -156,7 +149,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Number of registered processors.
-     * 
      * @return
      */
     protected int countOfProcessors() {
@@ -165,7 +157,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Number of registered processor in bound state.
-     * 
      * @return
      */
     protected int countOfBoundProcessors() {
@@ -174,7 +165,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Remove a registered processor.
-     * 
      * @param processor
      */
     protected void unregisterSmppProcessor(SmppProcessor processor) {
@@ -201,7 +191,6 @@ public abstract class SmppGwProcessor implements Processor {
     
     /**
      * Get <code>Map&lt;processorId, SmppProcessor&gt;</code> in an <b>unmodifiable collection</b>.
-     * 
      * @return
      */
     public Map<Integer, SmppProcessor> getSmppProcessorMap() {

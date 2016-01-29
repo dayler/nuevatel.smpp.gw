@@ -16,7 +16,7 @@ import com.nuevatel.mc.smpp.gw.domain.SmppGwSession;
 
 /**
  * 
- * TODO by impl
+ * Test class for SmppGwProcessor.
  * 
  * @author Ariel Salazar
  *

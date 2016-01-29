@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.dialog.server;
 
 import java.time.ZoneId;
@@ -45,13 +43,6 @@ import com.nuevatel.mc.tpdu.TpUd;
 
 /**
  * 
- * 
- * @author Ariel Salazar
- *
- */
-
-/**
- * 
  * <p>The SmscSubmitSmDialog class.</p>
  * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
  * 
@@ -74,7 +65,7 @@ public class SmscSubmitSmDialog extends Dialog {
 
     private String smppMsgId = "";
     
-    /*
+    /**
      * Delivery registered message id. Used to confirm delivery request to AppConn server (MC). -1 indicates no set value.
      */
     private long fwsmoCallMsgId = -1;
@@ -155,7 +146,7 @@ public class SmscSubmitSmDialog extends Dialog {
         // resf time
         ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
         // registered delivery
-        registeredDelivery = (submitSmPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) == Data.SM_SMSC_RECEIPT_REQUESTED;
+        registeredDelivery = (submitSmPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED;
         // SmsSubmit
         TpDcs tpDcs = TpDcsUtils.resolveTpDcs(submitSmPdu.getDataCoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
         EsmClass esmClass = new EsmClass(submitSmPdu.getEsmClass());

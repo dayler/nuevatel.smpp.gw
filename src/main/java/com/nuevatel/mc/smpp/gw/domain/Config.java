@@ -21,54 +21,73 @@ import com.nuevatel.common.util.Parameters;
 public class Config {
     
     /* Private variables */
-    /*
+    /**
      * Smpp message validity period expresed in seconds. By default 86400 seconds (1 day).
      */
     private long defaultValidityPeriod;
     
-    /*
+    /**
      * Beat period time (expressed in seconds). Only applicable for smpp clients. Default value 30s
      */
     private int enquireLinkPeriod;
     
-    /*
+    /**
      * Concurrency level for DialogCache. Default value 8.
      */
     private int dialogCacheConcurrencyLevel;
     
-    /*
+    /**
      * Concurrency level for DialogCache execution tasks. Default value 4.
      */
     private int dialogCacheTaskConcurrencyLevel;
     
-    /*
+    /**
      * Default time in seconds to keep an object in DialogCache, after insert it. It is not applicable if <b>validity period</b> is defined.
      */
     private long dialogCacheExpireAfterWriteTime;
     
-    /*
+    /**
      * Time(expressed in milliseconds) to await by an connection request before to pass next cycle. Only is used in smsc mode. Default value 500ms
      */
     private long serverListenerReceiveTimeout;
     
-    /*
+    /**
      * Time(expressed in milliseconds) to await by incoming smpp message. 
      */
     private long serverReceiverTimeout;
     
-    /*
+    /**
      * Period in which is reset the throttle counter. It is expressed in seconds.
      */
     private int throttleCounterTimelife;
     
-    /*
+    /**
      * Period for heartbeat check task.
      */
     private int heartbeatPeriod;
     
     /**
+     * Enable(true) disable pingTask. Default disable.
+     */
+    private boolean pingTaskEnable;
+    
+    /**
+     * Period in which is checking the network. Expressed in seconds.
+     */
+    private int pingTaskTime;
+    
+    /**
+     * Ping timeout. Expressed in milliseconds.
+     */
+    private int pingTaskTimeout;
+    
+    /**
+     * Number of fails, before to set connection lost.
+     */
+    private int pingTaskProbes;
+    
+    /**
      * Load all configuration fields from Properties.
-     * 
      * @param prop
      */
     public void load(Properties prop) {
@@ -81,11 +100,14 @@ public class Config {
         serverListenerReceiveTimeout = LongUtil.tryParse(prop.getProperty(PropName.serverlistenerReceiveTimeout.property()), 500L);
         throttleCounterTimelife = IntegerUtil.tryParse(prop.getProperty(PropName.throttleCounterTimelife.property()), 1);
         heartbeatPeriod = IntegerUtil.tryParse(prop.getProperty(PropName.smppGwHeartbeatPeriod.property()), 30);
+        pingTaskEnable = Boolean.valueOf(prop.getProperty(PropName.pingTaskEnable.property(), "false"));
+        pingTaskTime = IntegerUtil.tryParse(prop.getProperty(PropName.pingTaskTime.property()), 30);
+        pingTaskTimeout = IntegerUtil.tryParse(prop.getProperty(PropName.pingTaskTimeout.property()), 3000);
+        pingTaskProbes = IntegerUtil.tryParse(prop.getProperty(PropName.pingTaskProbes.property()), 3);
     }
     
     /**
      * Get Period in which is reset the throttle counter. It is expressed in seconds.
-     * 
      * @return
      */
     public int getThrottleCounterTimelife() {
@@ -93,8 +115,7 @@ public class Config {
     }
     
     /**
-     * Get Smpp message validity period expresed in seconds. By default 86400 seconds (1 day).
-     * 
+     * Get Smpp message validity period expressed in seconds. By default 86400 seconds (1 day).
      * @return
      */
     public long getDefaultValidityPeriod() {
@@ -102,8 +123,7 @@ public class Config {
     }
     
     /**
-     * Get Beat period time (expressed in seconds). Only applicable for smpp clients. Default value 30s
-     * 
+     * Get Beat period time (expressed in seconds). Only applicable for smpp clients. Default value 30s.
      * @return
      */
     public int getEnquireLinkPeriod() {
@@ -112,7 +132,6 @@ public class Config {
     
     /**
      * Get Concurrency level for DialogCache. Default value 8.
-     * 
      * @return
      */
     public int getDialogCacheConcurrencyLevel() {
@@ -121,7 +140,6 @@ public class Config {
     
     /**
      * Get Default time in seconds to keep an object in DialogCache, after insert it. It is not applicable if <b>validity period</b> is defined.
-     * 
      * @return
      */
     public long getDialogCacheExpireAfterWriteTime() {
@@ -130,7 +148,6 @@ public class Config {
     
     /**
      * Get Concurrency level for DialogCache execution tasks. Default value 4.
-     * 
      * @return
      */
     public int getDialogCacheTaskConcurrencyLevel() {
@@ -139,7 +156,6 @@ public class Config {
     
     /**
      * Get Time(expressed in milliseconds) to await by an connection request before to pass next cycle. Only is used in smsc mode. Default value 500ms
-     * 
      * @return
      */
     public long getServerListenerReceiveTimeout() {
@@ -148,7 +164,6 @@ public class Config {
     
     /**
      * Get Time(expressed in milliseconds) to await by incoming smpp message.
-     * 
      * @return
      */
     public long getServerReceiverTimeout() {
@@ -157,10 +172,41 @@ public class Config {
     
     /**
      *  Get Period for heartbeat check task.
-     * 
      * @return
      */
     public int getHeartbeatPeriod() {
         return heartbeatPeriod;
+    }
+
+    /**
+     * Get pingTaskEnable.
+     * @return
+     */
+    public boolean isPingTaskEnable() {
+        return pingTaskEnable;
+    }
+
+    /**
+     * Get pingTaskTime.
+     * @return
+     */
+    public int getPingTaskTime() {
+        return pingTaskTime;
+    }
+
+    /**
+     * Get pingTaskTimeout.
+     * @return
+     */
+    public int getPingTaskTimeout() {
+        return pingTaskTimeout;
+    }
+
+    /**
+     * Get pingTaskProbes.
+     * @return
+     */
+    public int getPingTaskProbes() {
+        return pingTaskProbes;
     }
 }

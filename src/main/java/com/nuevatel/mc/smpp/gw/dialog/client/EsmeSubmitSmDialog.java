@@ -1,6 +1,4 @@
-/**
- * 
- */
+
 package com.nuevatel.mc.smpp.gw.dialog.client;
 
 import java.time.LocalDateTime;
@@ -108,7 +106,7 @@ public class EsmeSubmitSmDialog extends Dialog {
         Parameters.checkNull(smsSubmit, "smsDeliver");
         
         gwProcessor = AllocatorService.getSmppGwProcessor(gwProcessorId);
-        this.registeredDelivery = (registeredDelivery & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED; 
+        this.registeredDelivery = smsSubmit.getTpSrr(); 
         this.smMessageId = smMessageId;
         this.fromName = fromName;
         this.toName = toName;
@@ -173,7 +171,8 @@ public class EsmeSubmitSmDialog extends Dialog {
                     // dispatch failed message
                     mcDispatcher.dispatch(fwsmoRetCall);
                     invalidate();
-                } else if (pdu.isOk() && Data.SUBMIT_SM_RESP == pdu.getCommandId()) {
+                }
+                else if (pdu.isOk() && Data.SUBMIT_SM_RESP == pdu.getCommandId()) {
                     if (registeredDelivery) {
                         // received response, go forward
                         state = DialogState.forward;
@@ -187,7 +186,8 @@ public class EsmeSubmitSmDialog extends Dialog {
                         mcDispatcher.dispatch(fwsmoRetCall);
                         // awaiting confirmation delivery
                         state = DialogState.awaiting_1;
-                    } else {
+                    }
+                    else {
                         // if register delivery is not true, finish transaction,
                         // no await by response.
                         state = DialogState.close;
@@ -199,7 +199,8 @@ public class EsmeSubmitSmDialog extends Dialog {
                         mcDispatcher.dispatch(fwsmoRetCall);
                         invalidate();
                     }
-                } else {
+                }
+                else {
                     // pdu is not ok
                     state = DialogState.failed;
                     tpStatus = Tpdu.TP_ST_ERROR_IN_SME;
@@ -211,7 +212,8 @@ public class EsmeSubmitSmDialog extends Dialog {
                     mcDispatcher.dispatch(fwsmoRetCall);
                     invalidate();
                 }
-            } else if (pdu.isRequest()) {
+            }
+            else if (pdu.isRequest()) {
                 // handle Report delivery response
                 if (pdu.getCommandId() == Data.DELIVER_SM) {
                     // forward resp and confirmation delivery to mc

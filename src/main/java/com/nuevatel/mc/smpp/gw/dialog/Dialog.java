@@ -48,7 +48,6 @@ public abstract class Dialog {
     
     /**
      * Creates a Dialog with <code>gwProcessorId</code> and <code>processorId</code>.
-     * 
      * @param gwProcessorId
      * @param processorId
      */
@@ -59,7 +58,6 @@ public abstract class Dialog {
     
     /**
      * Creates a Dialog with <code>dialogId</code>, <code>gwProcessorId</code> and <code>processorId</code>.
-     * 
      * @param dialogId Dialog id to identify the dialog. It must to the messageId used in the MC local.
      * @param gwProcessorId Id to identify the gateway processor at which belongs the dialog.
      * @param processorId Id to identify the processor at which belongs the dialog.
@@ -67,6 +65,7 @@ public abstract class Dialog {
     public Dialog(long dialogId, int gwProcessorId, int processorId) {
         this.dialogId = dialogId;
         this.gwProcessorId = gwProcessorId;
+        this.processorId = processorId;
     }
     
     /**
@@ -76,14 +75,12 @@ public abstract class Dialog {
     
     /**
      * Handle incoming <code>ServerPDUEvent</code>.
-     * 
      * @param ev
      */
     public abstract void handleSmppEvent(ServerPDUEvent ev);
     
     /**
      * Handle incoming <code>McMessage</code>.
-     * 
      * @param msg
      */
     public abstract void handleMcMessage(McMessage msg);
@@ -95,7 +92,6 @@ public abstract class Dialog {
     
     /**
      * The Dialog Id.
-     * 
      * @return
      */
     public long getDialogId() {
@@ -104,7 +100,6 @@ public abstract class Dialog {
     
     /**
      * Set the Dialog Id.
-     * 
      * @param dialogId
      */
     protected void setDialogId(long dialogId) {
@@ -113,7 +108,6 @@ public abstract class Dialog {
     
     /**
      * Set <code>smppMessageId</code>.
-     * 
      * @param smppMessageId
      */
     public void setSmppMessageId(String smppMessageId) {
@@ -122,7 +116,6 @@ public abstract class Dialog {
     
     /**
      * Get <code>smppMessageId</code>.
-     * 
      * @return
      */
     public String getSmppMessageId() {
@@ -131,7 +124,6 @@ public abstract class Dialog {
     
     /**
      * Set <code>currentSequenceNumber</code>.
-     * 
      * @param currentSequenceNumber
      */
     public void setCurrentSequenceNumber(int currentSequenceNumber) {
@@ -140,7 +132,6 @@ public abstract class Dialog {
     
     /**
      * Get <code>currentSequenceNumber</code>.
-     * 
      * @return
      */
     public int getCurrentSequenceNumber() {
@@ -149,7 +140,6 @@ public abstract class Dialog {
     
     /**
      * Get <code>DialogType</code> to corresponds with Dialog implementation.
-     * 
      * @return
      */
     public abstract DialogType getType();
@@ -163,7 +153,6 @@ public abstract class Dialog {
     
     /**
      * Get current state of the Dialog.
-     * 
      * @return
      */
     public DialogState getState() {
@@ -172,7 +161,6 @@ public abstract class Dialog {
     
     /**
      * Get current <code>currentMsgId</code>.
-     * 
      * @return
      */
     public String getCurrentMsgId() {
@@ -181,7 +169,6 @@ public abstract class Dialog {
     
     /**
      * Set current <code>currentMsgId</code>.
-     * 
      * @param currentMsgId
      */
     public void setCurrentMsgId(String currentMsgId) {

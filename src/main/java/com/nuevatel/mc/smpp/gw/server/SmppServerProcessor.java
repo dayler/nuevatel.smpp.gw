@@ -4,6 +4,7 @@ package com.nuevatel.mc.smpp.gw.server;
 import static com.nuevatel.common.util.Util.*;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
@@ -32,6 +33,7 @@ import com.nuevatel.common.util.Parameters;
 import com.nuevatel.common.util.StringUtils;
 import com.nuevatel.mc.smpp.gw.Constants;
 import com.nuevatel.mc.smpp.gw.SmppProcessor;
+import com.nuevatel.mc.smpp.gw.TcpPingService;
 import com.nuevatel.mc.smpp.gw.ThrotlleCounter;
 import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.server.SmscSubmitSmDialog;
@@ -77,6 +79,8 @@ public class SmppServerProcessor extends SmppProcessor {
     
     private boolean authorizedBind = true;
     
+    private TcpPingService pingTestService = null;
+    
     /**
      * SmppServerProcessor constructor.
      * @param gwSession
@@ -99,6 +103,16 @@ public class SmppServerProcessor extends SmppProcessor {
         receiver = new Receiver(transmitter, conn);
         // set handler
         receiver.setServerPDUEventListener((event)->handleServerPDUEvent(event));
+        // Test ping service
+        if (cfg.isPingTaskEnable()) {
+            try {
+                pingTestService = new TcpPingService(conn, () -> shutdown());
+                pingTestService.execute();
+                logger.info("TcpPingService - start(addr:{})", conn.getAddress());
+            } catch (UnknownHostException ex) {
+                logger.warn("Failed to initialize TcpPingService", ex);
+            }
+        }
     }
     
     @Override
@@ -344,6 +358,8 @@ public class SmppServerProcessor extends SmppProcessor {
     public void shutdown() {
         // Action to execute before to shutdown.
         if (onShutdownDelegate != null) onShutdownDelegate.execute();
+        // stop ping service
+        if (pingTestService != null) pingTestService.shutdown(); 
         // stop all services
         receiver.stop();
         setReceiving(false);

@@ -59,7 +59,7 @@ import static com.nuevatel.common.util.Util.*;
  * <p>The SmppClientProcessor class.</p>
  * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
  * 
- * Implements logic for the SMPP client.
+ * Implements logic for the SMPP client (single bind).
  * 
  * @author Ariel Salazar
  * @version 1.0
@@ -71,7 +71,7 @@ public class SmppClientProcessor extends SmppProcessor {
     
     /* Private variables */
     
-    /*
+    /**
      * Smpp session between client and external SMSC
      */
     private Session smppSession = null;
@@ -83,8 +83,7 @@ public class SmppClientProcessor extends SmppProcessor {
     private ThrotlleCounter throtlleCounter; 
     
     /**
-     * Creates an instance of <code>SmppClientProcessor</code>, from <code>SmppGwSession</code> and <code>ThrotlleCounter</code> service.
-     * 
+     * Creates an instance of <code>SmppClientProcessor</code> with <code>SmppGwSession</code> and <code>ThrotlleCounter</code> service.
      * @param gwSession
      * @param throtlleCounter
      */
@@ -100,7 +99,6 @@ public class SmppClientProcessor extends SmppProcessor {
     
     /**
      * <code>true</code> if client is bound.
-     * 
      * @return 
      */
     @Override
@@ -111,7 +109,6 @@ public class SmppClientProcessor extends SmppProcessor {
     /**
      * 
      * Do bind operation, between ESME entity and SMSC (SMPP server).
-     * 
      * @throws ValueNotSetException
      * @throws TimeoutException
      * @throws PDUException
@@ -143,9 +140,7 @@ public class SmppClientProcessor extends SmppProcessor {
         // Log response
         logger.info("Bind response: " + response.debugString());
         // Check if was succedded
-        if (isBound()) {
-            logger.info("bind succedded");
-        }
+        if (isBound()) logger.info("bind succedded");
         else {
             logger.error("bind failed. commandStatus:{} bindResponse:", response.getCommandStatus(), response.debugString());
             throw new FailedBindOperationException(response);
@@ -227,7 +222,8 @@ public class SmppClientProcessor extends SmppProcessor {
                                 logger.trace("Not found EsmeDeliverSmDialog. Created new dialog for dialogId:{}", deliverSmDialog.getDialogId());
                                 // message was accepted to deliver
                                 throtlleCounter.inc();
-                            } else {
+                            }
+                            else {
                                 // unknow / unsupported smpp message
                                 if (pdu.isRequest()) {
                                     // if is a request return NACK
@@ -250,11 +246,17 @@ public class SmppClientProcessor extends SmppProcessor {
         }
     }
     
+    /**
+     * Find Dialog id to corresponds with pdu.
+     * @param pdu
+     * @return
+     * @throws ValueNotSetException
+     */
     private Long findDialogId(PDU pdu) throws ValueNotSetException {
         if (pdu.isRequest() && Data.DELIVER_SM == pdu.getCommandId()) {
             DeliverSM deliverSM = (DeliverSM) pdu;
             // check if deliver sm contains ack
-            if ((deliverSM.getEsmClass() & Data.SM_ESME_DLV_ACK_TYPE) == Data.SM_ESME_DLV_ACK_TYPE) return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
+            if ((deliverSM.getEsmClass() & Data.SM_SMSC_DLV_RCPT_TYPE) == Data.SM_SMSC_DLV_RCPT_TYPE) return dialogService.findDialogIdByMessageId(((DeliverSM)pdu).getReceiptedMessageId());
             // other case deliver will originate dialog
             return null;
         }
@@ -263,6 +265,13 @@ public class SmppClientProcessor extends SmppProcessor {
         return null;
     }
     
+    /**
+     * Execute enquirelink.
+     * @throws ValueNotSetException
+     * @throws TimeoutException
+     * @throws PDUException
+     * @throws WrongSessionStateException
+     */
     public void enquireLink() throws ValueNotSetException, // do enquireLink
                                      TimeoutException, // do enquireLink
                                      PDUException, // do enquireLink
@@ -272,7 +281,6 @@ public class SmppClientProcessor extends SmppProcessor {
                 smppSession.enquireLink();
                 return;
             }
-
             logger.warn("smppGwId:{} is not bound...", gwSession.getSmppGwId());
         } catch (IOException ex) {
             logger.warn("Enquirelink failed...");
@@ -282,7 +290,6 @@ public class SmppClientProcessor extends SmppProcessor {
 
     /**
      * Receive messages from local MC and dispatch it to remote SMSC
-     * 
      */
     @Override
     public void dispatch() {
@@ -315,7 +322,6 @@ public class SmppClientProcessor extends SmppProcessor {
     
     /**
      * <code>true</code> if processor is running.
-     * 
      * @return
      */
     public boolean isRunning() {
@@ -329,7 +335,6 @@ public class SmppClientProcessor extends SmppProcessor {
 
     /**
      * Dispatch event to remote SMSC
-     * 
      * @param smppEvent event to dispatch
      * @throws IOException 
      * @throws WrongSessionStateException 
@@ -347,39 +352,38 @@ public class SmppClientProcessor extends SmppProcessor {
                                                            NotEnoughDataInByteBufferException,
                                                            TerminatingZeroNotFoundException {
         switch (smppEvent.type()) {
-            case SubmitSmEvent:
-                submitSm(castAs(SubmitSmppEvent.class, smppEvent));
-                break;
-            case DataSmEvent:
-                dataSm(castAs(DataSmEvent.class, smppEvent));
-                break;
-            case CancelSmEvent:
-                cancelSm(castAs(CancelSmEvent.class, smppEvent));
-                break;
-            case QuerySmEvent:
-                querySm(castAs(QuerySmEvent.class, smppEvent));
-                break;
-            case ReplaceSmEvent:
-                replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
-                break;
-            case GenericROkResponseEvent:
-                genericROkResponse(castAs(GenericResponseEvent.class, smppEvent));
-                break;
-            case DefaultROkResponseEvent:
-                defaultROkResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
-                break;
-            case GenericNAckEvent:
-                genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
-                break;
-            default:
-                logger.warn("Unknown SmppEvent...");
-                break;
+        case SubmitSmEvent:
+            submitSm(castAs(SubmitSmppEvent.class, smppEvent));
+            break;
+        case DataSmEvent:
+            dataSm(castAs(DataSmEvent.class, smppEvent));
+            break;
+        case CancelSmEvent:
+            cancelSm(castAs(CancelSmEvent.class, smppEvent));
+            break;
+        case QuerySmEvent:
+            querySm(castAs(QuerySmEvent.class, smppEvent));
+            break;
+        case ReplaceSmEvent:
+            replaceSm(castAs(ReplaceSmEvent.class, smppEvent));
+            break;
+        case GenericROkResponseEvent:
+            genericROkResponse(castAs(GenericResponseEvent.class, smppEvent));
+            break;
+        case DefaultROkResponseEvent:
+            defaultROkResponse(castAs(DefaultResponseOKEvent.class, smppEvent));
+            break;
+        case GenericNAckEvent:
+            genericNAckResponse(castAs(GenericNAckEvent.class, smppEvent));
+            break;
+        default:
+            logger.warn("Unknown SmppEvent...");
+            break;
         }
     }
 
     /**
      * Send Generic ROk response.
-     * 
      * @param event
      * @throws ValueNotSetException
      * @throws WrongSessionStateException
@@ -394,7 +398,6 @@ public class SmppClientProcessor extends SmppProcessor {
 
     /**
      * Dispatch generic NACK event.
-     * 
      * @param event
      * @throws ValueNotSetException
      * @throws WrongSessionStateException
@@ -408,7 +411,7 @@ public class SmppClientProcessor extends SmppProcessor {
     }
 
     /**
-     * 
+     * Send default ROK.
      * @param smResp Event to contains default response for smpp event.
      * @throws IOException 
      * @throws WrongSessionStateException 
@@ -423,7 +426,6 @@ public class SmppClientProcessor extends SmppProcessor {
 
     /**
      * <code>BindRequest</code> based on <code>SmppGwSession.BIND_TYPE</code>.
-     * 
      * @param type
      * @return 
      */
@@ -440,7 +442,6 @@ public class SmppClientProcessor extends SmppProcessor {
 
     /**
      * Submit a single message from queue.
-     * 
      * @throws IOException 
      * @throws WrongSessionStateException 
      * @throws PDUException 
@@ -483,7 +484,6 @@ public class SmppClientProcessor extends SmppProcessor {
 
     /**
      * Cancel single short message
-     * 
      * @param event
      * @throws ValueNotSetException
      * @throws TimeoutException
@@ -510,7 +510,6 @@ public class SmppClientProcessor extends SmppProcessor {
     
     /**
      * Dispatch data sm event
-     * 
      * @param event
      * @throws ValueNotSetException
      * @throws TimeoutException
@@ -538,6 +537,7 @@ public class SmppClientProcessor extends SmppProcessor {
     }
     
     /**
+     * Dispatch ReplaceSm pdu.
      * @throws IOException 
      * @throws WrongSessionStateException 
      * @throws PDUException 
@@ -566,6 +566,15 @@ public class SmppClientProcessor extends SmppProcessor {
         smppSession.replace(request);
     }
     
+    /**
+     * Dispatch QuerySm pdu.
+     * @param event
+     * @throws ValueNotSetException
+     * @throws TimeoutException
+     * @throws PDUException
+     * @throws WrongSessionStateException
+     * @throws IOException
+     */
     private void querySm(QuerySmEvent event) throws ValueNotSetException, // do query
                                                      TimeoutException, // do query
                                                      PDUException, // do query, message id

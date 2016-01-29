@@ -24,7 +24,7 @@ import com.nuevatel.mc.smpp.gw.event.SmppEvent;
  * <p>Nuevatel PCS de Bolivia S.A. (c) 2016</p>
  * 
  * Abstract class, its implementations are responsible to implement the logic to handle smpp messages (client or server). For each bind enable in
- * <code>SmppGwSession#getMaxBinds</code>, an instance of this kind is created.
+ * <code>SmppGwSession#getMaxBinds</code>, an instance of this kind is created for each bind available.
  * 
  * @author Ariel Salazar
  * @version 1.0
@@ -38,17 +38,17 @@ public abstract class SmppProcessor {
     
     protected SmppGwSession gwSession;
     
-    /*
+    /**
      * Id that was assigned to this processor. <code>null</code> indicates, the processot was not asigned yet.
      */
     private Integer smppProcessorId = null;
     
-    /*
+    /**
      * All incoming events from the SMSC (SMPP server)
      */
     protected BlockingQueue<ServerPDUEvent>serverPduEvents = new LinkedBlockingDeque<>();
     
-    /*
+    /**
      * All outgoing events. Messages to submit to remote SMSC (SMPP server)
      */
     protected BlockingQueue<SmppEvent>smppEvents = new LinkedBlockingQueue<>();
@@ -58,8 +58,7 @@ public abstract class SmppProcessor {
     protected Config cfg = AllocatorService.getConfig();
     
     /**
-     * Constructor, creates <code>SmppProcessor</code> from <code>SmppGwSession</code>.
-     * 
+     * Constructor, creates <code>SmppProcessor</code> with <code>SmppGwSession</code>.
      * @param gwSession
      */
     public SmppProcessor(SmppGwSession gwSession) {
@@ -74,14 +73,12 @@ public abstract class SmppProcessor {
     public abstract void receive();
     
     /**
-     * Handle outgoing smpp messages. Consume from <b>smppEvents</b>
-     * 
+     * Handle outgoing smpp messages. Consume from <b>smppEvents</b>.
      */
     public abstract void dispatch();
     
     /**
      * Get smppProcessorId.
-     * 
      * @return
      */
     public Integer getSmppProcessorId() {
@@ -90,7 +87,6 @@ public abstract class SmppProcessor {
     
     /**
      * Set smppProcessorId.
-     * 
      * @param smppProcessorId
      */
     public void setSmppProcessorId(Integer smppProcessorId) {
@@ -99,7 +95,6 @@ public abstract class SmppProcessor {
     
     /**
      * Schedule a single event for delivering to remote SMSC.
-     * 
      * @param event Event to schedule.
      * @return <code>true</code> if the event was scheduled.
      */
@@ -113,7 +108,6 @@ public abstract class SmppProcessor {
     
     /**
      * Schedule smpp event to dispatch.
-     * 
      * @param event
      * @return
      */
@@ -131,17 +125,14 @@ public abstract class SmppProcessor {
     public abstract void shutdown();
     
     /**
-     * Assign seq number and register it on <code>smppMsgToDialogMap</code>.
-     * 
+     * Assign sequence number and register it on <code>smppMsgToDialogMap</code>.
      * @param pdu 
      * @param dialogId 
      */
     protected void assignSequenceNumber(PDU pdu, long dialogId) {
         pdu.assignSequenceNumber(true);
-        if (dialogId < 0) {
-            // no map
-            return;
-        }
+        // no map
+        if (dialogId < 0) return;
         dialogService.registerSequenceNumber(pdu.getSequenceNumber(), dialogId);
     }
     
@@ -162,10 +153,8 @@ public abstract class SmppProcessor {
             return;
         }
         try {
-            if (!serverPduEvents.offer(pduEvent, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) {
-                // warn the queue rejects the event
-                logger.warn("Failed to offer serverPDUEvent:{}", pduEvent.getPDU().debugString());
-            }
+            // warn the queue rejects the event
+            if (!serverPduEvents.offer(pduEvent, Constants.TIMEOUT_OFFER_EVENT_QUEUE, TimeUnit.MILLISECONDS)) logger.warn("Failed to offer serverPDUEvent:{}", pduEvent.getPDU().debugString());
         } catch (InterruptedException ex) {
             // On offer event
             logger.error("On handleServerPDUEvent...", ex);

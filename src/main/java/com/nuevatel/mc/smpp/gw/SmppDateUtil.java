@@ -36,8 +36,7 @@ public final class SmppDateUtil {
     }
     
     /**
-     * Gets String representation for the SmppDatetime. <b>It is always in absolute format.</b>
-     * 
+     * Get String representation for the SmppDatetime. <b>It is always in smpp absolute format.</b>
      * @param time
      * @return 
      */
@@ -46,8 +45,7 @@ public final class SmppDateUtil {
     }
     
     /**
-     * Gets string representation for the SmppDatetime. <b>It is always in absolute format.</b>
-     * 
+     * Get string representation for the SmppDatetime. <b>It is always in smpp absolute format.</b>
      * @param time
      * @return 
      */
@@ -57,7 +55,6 @@ public final class SmppDateUtil {
     
     /**
      * Parse smpp string date time, to <code>ZonedDateTime</code>.
-     * 
      * @param now
      * @param strDateTime
      * @return

@@ -78,6 +78,9 @@ public final class Constants {
      */
     public static final int TCPIP_CONN_RECIEVE_TIMEOUT = 20000;
     
+    /**
+     * Prevent instantiation.
+     */
     private Constants() {
         // no op. prevent instantiation.
     }

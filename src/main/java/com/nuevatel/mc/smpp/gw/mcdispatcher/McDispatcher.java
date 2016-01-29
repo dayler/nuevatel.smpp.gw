@@ -10,7 +10,10 @@ import java.util.concurrent.TimeoutException;
 
 import com.nuevatel.common.appconn.Message;
 import com.nuevatel.common.exception.OperationRuntimeException;
+import com.nuevatel.common.util.Tic;
 import com.nuevatel.mc.appconn.McMessage;
+import com.nuevatel.mc.common.stat.StatService.STAT_TIME;
+import com.nuevatel.mc.common.stat.StatService.STAT_VALUE;
 import com.nuevatel.mc.smpp.gw.SmppGwApp;
 
 /**
@@ -62,7 +65,10 @@ public class McDispatcher {
         }
         service.execute(() -> {
             try {
-                SmppGwApp.getSmppGwApp().getAppClient().dispatch(msg.toMessage());
+                Message rawMsg = msg.toMessage();
+                SmppGwApp.getSmppGwApp().getAppClient().dispatch(rawMsg);
+                // Register statistics
+                addStatValue(rawMsg.getCode());
             } catch (Exception ex) {
                 throw new OperationRuntimeException("Failed to dispatch message", ex);
             }
@@ -72,6 +78,7 @@ public class McDispatcher {
     /**
      * Dispatch AppConn message and await response.
      * @param msg Message to dispatch.
+     * @param tic
      * @return Appconn message response.
      * @throws InterruptedException
      * @throws ExecutionException
@@ -81,7 +88,32 @@ public class McDispatcher {
         if (msg == null) {
             return null;
         }
-        Future<Message>future = service.submit(()->SmppGwApp.getSmppGwApp().getAppClient().dispatch(msg.toMessage()));
+        Message rawMsg = msg.toMessage();
+        Tic tic = new Tic();
+        Future<Message>future = service.submit(()->SmppGwApp.getSmppGwApp().getAppClient().dispatch(rawMsg));
+        addStatTime(rawMsg.getCode(), tic);
         return future.get(10, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Add statValue.
+     * @param code
+     */
+    private void addStatValue(int code) {
+        if (McMessage.FORWARD_SM_O_RET_ASYNC_CALL == code) SmppGwApp.getSmppGwApp().getStatService().add(STAT_VALUE.FORWARD_SM_O_RET_ASYNC_CALL, 1);
+    }
+
+    /**
+     * Add statTime.
+     * @param code
+     * @param tic
+     */
+    private void addStatTime(int code, Tic tic) {
+        if (McMessage.FORWARD_SM_I_CALL == code) {
+            SmppGwApp.getSmppGwApp().getStatService().add(STAT_TIME.FORWARD_SM_I_CALL, 1, tic.toc(), (long) Math.pow(tic.getElapsedTime(), 2));
+        }
+        else {
+            // No op
+        }
     }
 }

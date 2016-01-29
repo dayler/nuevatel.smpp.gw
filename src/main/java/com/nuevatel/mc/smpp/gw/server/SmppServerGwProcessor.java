@@ -70,7 +70,7 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
             }
             
             if (isReceiving()) {
-                logger.info("SmppGwSessionId:{} Ready to receive connection requests...", gwSession.getSmppGwId());
+                logger.info("SmppGwSessionId:{} Ready to receive connection requests [ADDR:{} PORT:{}]...", gwSession.getSmppGwId(), gwSession.getSmscAddress(), gwSession.getSmscPort());
             }
             else {
                 logger.warn("SmppGwSessionId:{} SmppServerListener is not initialized properly...", gwSession.getSmppGwId());
@@ -80,7 +80,8 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
                 receive();
             }
         } catch (IOException ex) {
-            logger.error("Failed on execute SmppServerListener. Listener is Finalizing...", ex);
+            logger.fatal("Failed on execute SmppServerListener. Listener is Finalizing...", ex);
+            shutdown(60);
         }
     }
     
@@ -132,8 +133,10 @@ public class SmppServerGwProcessor extends SmppGwProcessor {
      */
     private void checkHealthOfProcessor(SmppServerProcessor processor) {
         // shutdown processor. On shutdown delegate will remove it from map
-        if (!processor.isConnected()) processor.shutdown();
-        unregisterSmppProcessor(processor);
+        if (!processor.isConnected()) {
+            processor.shutdown();
+            unregisterSmppProcessor(processor);
+        } 
     }
     
     @Override

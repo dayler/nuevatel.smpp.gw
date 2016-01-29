@@ -23,8 +23,7 @@ public class McMessageId {
     private int msgIdNumber = 0;
     
     /**
-     * Gets new MC Message Id.
-     * 
+     * Get new MC Message Id.
      * @param ldt
      * @param mcId
      * @return

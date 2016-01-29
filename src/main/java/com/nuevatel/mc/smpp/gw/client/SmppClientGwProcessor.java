@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package com.nuevatel.mc.smpp.gw.client;
 
 import java.util.concurrent.ExecutorService;
@@ -48,7 +44,6 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
     
     /**
      * Initialize service processor
-     * 
      * @param gwSession
      */
     public SmppClientGwProcessor(SmppGwSession gwSession) {
@@ -83,7 +78,7 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
                     logger.error("At index {} cannot be start SmppClientProcessor...", i, ex);
                 }
             }
-            logger.info("SmppClientGwProcessor[smppGwId:{}] was started. {} binds was succedded...", gwSession.getSmppGwId(), countOfBoundProcessors());
+            logger.info("SmppClientGwProcessor[smppGwId:{}] was started. {} binds was succedded [SMSC:{} PORT:{}]...", gwSession.getSmppGwId(), countOfBoundProcessors(), gwSession.getSmscAddress(), gwSession.getSmscPort());
         } catch (Throwable ex) {
             logger.fatal("Failed to execute SmppClientGwProcessor[smppGwId:{}]...", gwSession.getSmppGwId(), ex);
             // try shutdown
@@ -93,7 +88,6 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
     
     /**
      * Do bind action for a single processor.
-     * 
      * @param processor
      */
     private void doBind(SmppClientProcessor processor) {
@@ -109,8 +103,7 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
     }
     
     /**
-     * Try to reconect with SMSC if connection was lost.
-     * 
+     * Try to reconnect with SMSC if connection was lost.
      * @param processor
      */
     private void tryReconnect(SmppClientProcessor processor) {
@@ -137,7 +130,6 @@ public class SmppClientGwProcessor extends SmppGwProcessor {
     
     /**
      * Do enquire link.
-     * 
      * @param clientProcessor
      */
     private void doEnquireLink(SmppClientProcessor clientProcessor) {

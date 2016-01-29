@@ -81,9 +81,7 @@ public class SmppGw {
                                                                       mgmtId,
                                                                       properties.getProperty(MGMT_UNSERNAME), // user
                                                                       properties.getProperty(MGMT_PASSWORD)); // password
-                if (mgmtApp == null) {
-                    throw new RuntimeException("illegal " + MGMT_ID + " " + properties.getProperty(MGMT_ID));
-                }
+                if (mgmtApp == null) throw new RuntimeException("illegal " + MGMT_ID + " " + properties.getProperty(MGMT_ID));
                 SmppGwApp smppGwApp = SmppGwApp.getSmppGwApp();
                 smppGwApp.setAppId(appId);
                 smppGwApp.setMgmt(mgmtApp);

@@ -44,9 +44,6 @@ public class ForwardSmOTask implements Task {
     
     private Config cfg = AllocatorService.getConfig();
     
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Message execute(Conn conn, Message msg) throws Exception {
         if (msg == null) {
@@ -91,7 +88,8 @@ public class ForwardSmOTask implements Task {
                 esmeSubmitDialog.init();
                 logger.trace("Not found EsmeSubmitSmDialog. Created new dialog for dialogId:{}", esmeSubmitDialog.getDialogId());
                 return new ForwardSmORet(AppMessages.ACCEPTED).toMessage();
-            } else if (SmppGwSession.SMPP_TYPE.SMSC.equals(gwSession.getSmppType())) {
+            }
+            else if (SmppGwSession.SMPP_TYPE.SMSC.equals(gwSession.getSmppType())) {
                 // smsc deliver_sm
                 SmsDeliver smsDeliver = new SmsDeliver(fwsmoCall.getTpdu());
                 SmscDeliverSmDialog smscDeliverDialog = new SmscDeliverSmDialog(// dialogId
@@ -111,7 +109,8 @@ public class ForwardSmOTask implements Task {
                 smscDeliverDialog.init();
                 logger.trace("Not found SmscDeliverSmDialog. Created new dialog for dialogId:{}", smscDeliverDialog.getDialogId());
                 return new ForwardSmORet(AppMessages.ACCEPTED).toMessage();
-            } else {
+            }
+            else {
                 // No op
                 logger.warn("Unknow SmppGwSession.SMPP_TYPE");
                 // Failed

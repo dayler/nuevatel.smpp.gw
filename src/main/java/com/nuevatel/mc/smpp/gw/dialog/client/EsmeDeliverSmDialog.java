@@ -105,7 +105,7 @@ public class EsmeDeliverSmDialog extends Dialog {
             deliverPdu = (DeliverSM) ev.getPDU();
             // do received ok response to remote smsc
             // get register delivery
-            registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SME_ACK_MASK) != Data.SM_SME_ACK_NOT_REQUESTED;
+            registeredDelivery = (deliverPdu.getRegisteredDelivery() & Data.SM_SMSC_RECEIPT_MASK) != Data.SM_SMSC_RECEIPT_NOT_REQUESTED;
             // create SmsSubmit
             TpDcs tpDcs = TpDcsUtils.resolveTpDcs(deliverPdu.getDataCoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
             EsmClass esmClass = new EsmClass(deliverPdu.getEsmClass());

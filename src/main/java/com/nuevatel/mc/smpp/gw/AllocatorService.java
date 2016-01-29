@@ -51,19 +51,15 @@ public final class AllocatorService {
     
     /**
      * App configuration properties.
-     * 
      * @return
      */
     public static Properties getProperties() {
-        if (properties == null) {
-            throw new NullProperties();
-        }
+        if (properties == null) throw new NullProperties();
         return properties;
     }
     
     /**
      * Set app configuration properties.
-     * 
      * @param properties
      */
     public static void setProperties(Properties properties) {
@@ -80,19 +76,15 @@ public final class AllocatorService {
     
     /**
      * Gets <code>DialogService</code> instance.
-     * 
      * @return
      */
     public static DialogService getDialogService() {
-        if (dialogService == null) {
-            throw new NullDialogService();
-        }
+        if (dialogService == null) throw new NullDialogService();
         return dialogService;
     }
     
     /**
      * Register <code>SmppGwProcessor</code>, gateway instance.
-     * 
      * @param smppGwId The gateway id, with which is registered the Processor.
      * @param processor The processor to register.
      */
@@ -109,7 +101,6 @@ public final class AllocatorService {
     
     /**
      * Gets processor to corresponds with <code>smppGwId</code>. <code>null</code> if there are not processor to corresponds with <code>smppGwId</code>.
-     * 
      * @param smppGwId The smpp gw id (defined on table <code>mc.mc_smpp_gw</code>)
      * @return 
      */
@@ -119,7 +110,6 @@ public final class AllocatorService {
     
     /**
      * Initialize <code>McDispatcher</code>, this step is needed before to use any service of <code>McDispatcher</code>.
-     * 
      * @param size
      */
     public static void startMcDispatcher(int size) {
@@ -128,7 +118,6 @@ public final class AllocatorService {
     
     /**
      * Gets <code>McDispatcher</code> instance.
-     * 
      * @return
      */
     public static McDispatcher getMcDispatcher() {
@@ -146,8 +135,7 @@ public final class AllocatorService {
     }
     
     /**
-     * Gets configuration of app.
-     * 
+     * Get configuration of app.
      * @return
      */
     public static Config getConfig() {
@@ -156,10 +144,17 @@ public final class AllocatorService {
     
     /**
      * Load configuration app properties.
-     * 
      * @param prop
      */
     public static void loadConfig(Properties prop) {
         config.load(prop);
+    }
+    
+    /**
+     * Set config.
+     * @param config
+     */
+    public static void setConfig(Config config) {
+        AllocatorService.config = config;
     }
 }

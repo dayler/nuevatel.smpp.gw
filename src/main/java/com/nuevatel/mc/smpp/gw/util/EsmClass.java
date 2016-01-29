@@ -17,29 +17,29 @@ import org.smpp.Data;
 public class EsmClass {
     
     /* Private variables */
-    /*
+    /**
      * ESME -> SMSC. Store and forward mode.
      */
     private boolean storeAndForward;
     
-    /*
+    /**
      * ESME -> SMSC: Short message contains ESME delivery acknowledgement.
      * <br/>
      * SMSC -> ESME: Short message contains SME delivery acknowledgement.
      */
     private boolean deliveryAck;
     
-    /*
+    /**
      * GSM User Data Header Indicator.
      */
     private boolean udhi;
     
-    /*
+    /**
      * GSM Reply Path.
      */
     private boolean replyPath;
     
-    /*
+    /**
      * EsmClass
      */
     private byte esmClass;

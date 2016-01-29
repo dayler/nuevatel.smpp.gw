@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.nuevatel.common.cache.CacheBuilder;
-import com.nuevatel.common.cache.CacheLoader;
 import com.nuevatel.common.cache.LoadingCache;
 import com.nuevatel.common.exception.OperationRuntimeException;
 import com.nuevatel.common.util.StringUtils;
@@ -57,7 +56,6 @@ public class DialogService {
     
     /**
      * Find dialog Id, based on smpp message id.
-     * 
      * @param msgId
      * @return
      */
@@ -66,8 +64,7 @@ public class DialogService {
     }
     
     /**
-     * Register message id with its corresponding dilog id.
-     * 
+     * Register message id with its corresponding dialog id.
      * @param msgId smpp message id to register.
      * @param dialogId Dialog Id in which register message id.
      */
@@ -82,13 +79,17 @@ public class DialogService {
         dialog.setCurrentMsgId(msgId);
     }
     
+    /**
+     * Find dialog by its current sequence number.
+     * @param seqNumber
+     * @return
+     */
     public Long findDialogIdBySequenceNumber(int seqNumber) {
         return smppSeqIdToDialogMap.get(seqNumber);
     }
     
     /**
-     * Register newSeqNumber for Dialog(dialogId)
-     * 
+     * Register newSeqNumber for Dialog(dialogId).
      * @param newSeqNumber New Seq number to register for Dialog
      * @param dialogId Dialog Id in which register newSeqNumber
      */
@@ -106,18 +107,20 @@ public class DialogService {
         dialog.setCurrentSequenceNumber(newSeqNumber);
     }
     
+    /**
+     * Create and initialize LoadingCahce.
+     */
     private void resolveLoadingCache() {
         int size = cfg.getDialogCacheConcurrencyLevel();
         long expireAfterWriteTime = AllocatorService.getConfig().getDialogCacheExpireAfterWriteTime();
         dialogCache = CacheBuilder.newCacheBuilder().setExpireAfterReadTime(expireAfterWriteTime)
                                                     .setSize(size)
                                                     .setTimeUnit(TimeUnit.SECONDS)
-                                                    .buildSimpleLoadingCache(new DialogLoader(), (k, d) -> onRemoveDialog(k, d));
+                                                    .buildSimpleLoadingCache((k) -> onLoadDialog(k), (k, d) -> onRemoveDialog(k, d));
     }
     
     /**
      * Get <code>Dialog</code> to belongs dialogId. <code>null</code> if it not exists.
-     * 
      * @param dialogId
      * @return 
      */
@@ -129,37 +132,28 @@ public class DialogService {
     
     /**
      * Register a dialog in the cache.
-     * 
      * @param dialog 
      * @param expireAfterWriteTime Time in seconds after which it is forced to invalidated. 
      */
     public void putDialog(Dialog dialog, long expireAfterWriteTime) {
         if (dialog != null) {
-            if (dialog.getDialogId() < 0) {
-                throw new OperationRuntimeException("dialogId == -1, not asigned dialog Id.");
-            }
+            if (dialog.getDialogId() < 0) throw new OperationRuntimeException("dialogId == -1, not asigned dialog Id.");
             dialogCache.put(dialog.getDialogId(), dialog , expireAfterWriteTime, 0L/* disable after read */, TimeUnit.SECONDS);
         }
     }
     
     /**
      * Invalidate Dialog.
-     * 
      * @param dialog
      */
     public void invalidate(Dialog dialog) {
         dialogCache.invalidate(dialog.getDialogId());
-        if (dialog.getCurrentSequenceNumber() != -1) {
-            smppSeqIdToDialogMap.remove(dialog.getCurrentSequenceNumber());
-        }
-        if (!StringUtils.isEmptyOrNull(dialog.getCurrentMsgId())) {
-            smppMsgIdToDialogMap.remove(dialog.getCurrentMsgId());
-        }
+        if (dialog.getCurrentSequenceNumber() != -1) smppSeqIdToDialogMap.remove(dialog.getCurrentSequenceNumber());
+        if (!StringUtils.isEmptyOrNull(dialog.getCurrentMsgId())) smppMsgIdToDialogMap.remove(dialog.getCurrentMsgId());
     }
     
     /**
      * <code>true</code> if exists in the cache a dialog with <code>dialogId</code>.
-     * 
      * @param dialogId Dialog to find
      */
     public boolean containsDialog(long dialogId) {
@@ -167,14 +161,12 @@ public class DialogService {
     }
     
     /**
-     * No action should never call.
+     * Formal process for LoadingCache. Should never call.
+     * @return
+     * @throws Exception
      */
-    private static final class DialogLoader implements CacheLoader<Long, Dialog> {
-
-        @Override
-        public Dialog load(Long key) throws Exception {
-            throw new NoDialogCachedObject();
-        }
+    private Dialog onLoadDialog(Long key) throws Exception {
+        throw new NoDialogCachedObject();
     }
     
     /**

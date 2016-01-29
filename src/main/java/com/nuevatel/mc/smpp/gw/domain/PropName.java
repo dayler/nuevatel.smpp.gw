@@ -22,13 +22,16 @@ public enum PropName {
     serverReceiverTimeout("smppgw.serverreceiver.timeout"),
     throttleCounterTimelife("smppgw.throttleCounter.timelife"),
     smppGwHeartbeatPeriod("smppgw.heartbeatPeriod"),
+    pingTaskEnable("smppgw.pingTask.enable"),
+    pingTaskTime("smppgw.pingTask.time"),
+    pingTaskTimeout("smppgw.pingTask.timeout"),
+    pingTaskProbes("smppgw.pingTask.probes"),
     ;
     
     private String property;
     
     /**
      * Creates <code>PropName</code> from property name.
-     * 
      * @param prop
      */
     private PropName(String prop) {
@@ -37,7 +40,6 @@ public enum PropName {
     
     /**
      * Get property name, defined in its constructor.
-     * 
      * @return
      */
     public String property() {

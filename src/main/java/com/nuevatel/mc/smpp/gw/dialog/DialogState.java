@@ -30,7 +30,9 @@ public enum DialogState {
     /**
      * Dialog is forwarding to next step.
      */
-    forward,
+    forward_0,
+    forward_1,
+    forward_2,
     /**
      * Dialog in close state. All process was succeeded.
      */

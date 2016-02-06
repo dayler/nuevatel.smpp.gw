@@ -1,6 +1,8 @@
 
 package com.nuevatel.mc.smpp.gw.dialog.server;
 
+import static com.nuevatel.mc.smpp.gw.util.NameTypeUtils.*;
+
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.concurrent.ExecutionException;
@@ -106,15 +108,15 @@ public class SmscDeliverSmDialog extends Dialog {
         logger.info("Created Dialog. dialogId:{} rds:{}", dialogId, registeredDelivery);
         state = DialogState.init;
         // Prepare smppevent.
-        state = DialogState.forward;
+        state = DialogState.forward_0;
         try {
             // create deliver_sm event
             EsmClass esmClass = new EsmClass(smsDeliver.getTpSri(), smsDeliver.getTpUdhi(), smsDeliver.getTpRp());
             DeliverSmEvent deliverSmEv = new DeliverSmEvent(dialogId);
             deliverSmEv.setEsmClass(esmClass.getValue());
-            Address sourceAddr = new Address(smsDeliver.getTpOa().getTon(), smsDeliver.getTpOa().getNpi(), smsDeliver.getTpOa().getAddress());
+            Address sourceAddr = new Address(getSmppTon(smsDeliver.getTpOa().getTon()), getSmppNpi(smsDeliver.getTpOa().getNpi()), smsDeliver.getTpOa().getAddress());
             deliverSmEv.setSourceAddr(sourceAddr);
-            Address destAddr = new Address((byte) (toName.getType() & TpAddress.TON), (byte) (toName.getType() & TpAddress.NPI), toName.getName());
+            Address destAddr = new Address(getSmppTon(toName.getType()), getSmppNpi(toName.getType()), toName.getName());
             deliverSmEv.setDestAddr(destAddr);
             deliverSmEv.setRegisteredDelivery(registeredDelivery ? Data.SM_SMSC_RECEIPT_REQUESTED : Data.SM_SMSC_RECEIPT_NOT_REQUESTED);
             // set sm message
@@ -135,6 +137,7 @@ public class SmscDeliverSmDialog extends Dialog {
     
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
+        super.handleSmppEvent(ev);
         PDU pdu = null;
         try {
             pdu = ev.getPDU();
@@ -200,7 +203,7 @@ public class SmscDeliverSmDialog extends Dialog {
         logger.debug("ForwardSmORetAsyncCall messageId:{} ret:{} serviceMsg:{}", dialogId, ret, commandStatusCode);
         if (registeredDelivery) {
             LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
-            TpAddress destAddr = new TpAddress((byte)(toName.getType() & TpAddress.TON), (byte)(toName.getType() & TpAddress.NPI), toName.getName());
+            TpAddress destAddr = new TpAddress(getSmppTon(toName.getType()), getSmppNpi(toName.getType()), toName.getName());
             tpStatus = TpStatusResolver.resolveTpStatus(commandStatusCode);
             SmsStatusReport smsSr = new SmsStatusReport(false, false, false, (byte) 0x0, destAddr, now, now, tpStatus);
             ForwardSmICall fwsmiCall = new ForwardSmICall(dialogId, smsSr.getTpdu());

@@ -30,6 +30,8 @@ public abstract class Dialog {
     
     private String currentMsgId = null;
     
+    private ServerPDUEvent pduEvent = null;
+    
     protected long dialogId;
     
     protected int gwProcessorId;
@@ -77,7 +79,9 @@ public abstract class Dialog {
      * Handle incoming <code>ServerPDUEvent</code>.
      * @param ev
      */
-    public abstract void handleSmppEvent(ServerPDUEvent ev);
+    public void handleSmppEvent(ServerPDUEvent ev) {
+        pduEvent = ev;
+    }
     
     /**
      * Handle incoming <code>McMessage</code>.
@@ -173,5 +177,13 @@ public abstract class Dialog {
      */
     public void setCurrentMsgId(String currentMsgId) {
         this.currentMsgId = currentMsgId;
+    }
+    
+    /** 
+     * Get last <code>ServerPDUEvent</code>.
+     * @return
+     */
+    public ServerPDUEvent getPduEvent() {
+        return pduEvent;
     }
 }

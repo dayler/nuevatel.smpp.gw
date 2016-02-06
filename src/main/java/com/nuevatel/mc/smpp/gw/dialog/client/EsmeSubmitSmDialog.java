@@ -1,6 +1,8 @@
 
 package com.nuevatel.mc.smpp.gw.dialog.client;
 
+import static com.nuevatel.mc.smpp.gw.util.NameTypeUtils.*;
+
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -118,12 +120,12 @@ public class EsmeSubmitSmDialog extends Dialog {
     public void init() {
         try {
             logger.info("Create Dialog. dialogId:{} rds:{}", dialogId, registeredDelivery);
-            state = DialogState.forward;
+            state = DialogState.forward_0;
             // Prepare SmppEvent
             SubmitSmppEvent event = new SubmitSmppEvent(dialogId);
-            Address sourceAddr = new Address((byte)(fromName.getType() & TpAddress.TON), (byte)(fromName.getType() & TpAddress.NPI), fromName.getName());
+            Address sourceAddr = new Address(getSmppTon(fromName.getType()), getSmppNpi(fromName.getType()), fromName.getName());
             event.setSourceAddr(sourceAddr);
-            Address destAddr = new Address((byte)(toName.getType() & TpAddress.TON), (byte)(toName.getType() & TpAddress.NPI), toName.getName());
+            Address destAddr = new Address(getSmppTon(toName.getType()), getSmppNpi(toName.getType()), toName.getName());
             event.setDestAddr(destAddr);
             // replcae if present
             event.setReplaceIfPresentFlag((byte)Data.SM_REPLACE);
@@ -133,7 +135,7 @@ public class EsmeSubmitSmDialog extends Dialog {
             // serviceCentre timestamp
             event.setScheduleDeliveryTime(SmppDateUtil.toSmppDatetime(smsSubmit.getTpVp() == null ? LocalDateTime.now(ZoneId.systemDefault()).plusSeconds(defaultValidityPeriod) : smsSubmit.getTpVp()));
             // use default validity period
-            ZonedDateTime validityPeriod = defaultValidityPeriod > 0 ? ZonedDateTime.now(ZoneId.systemDefault()).plus(defaultValidityPeriod, ChronoUnit.MILLIS) : ZonedDateTime.now(ZoneId.of("UTC"));
+            ZonedDateTime validityPeriod = defaultValidityPeriod > 0 ? ZonedDateTime.now(ZoneId.systemDefault()).plus(defaultValidityPeriod, ChronoUnit.MILLIS) : ZonedDateTime.now(ZoneId.systemDefault());
             event.setValidityPeriod(SmppDateUtil.toSmppDatetime(validityPeriod));
             // esm_class
             // default message mode, default message type
@@ -144,7 +146,7 @@ public class EsmeSubmitSmDialog extends Dialog {
             // registered delivery
             event.setRegisteredDelivery(registeredDelivery ? Data.SM_SMSC_RECEIPT_REQUESTED : Data.SM_SMSC_RECEIPT_NOT_REQUESTED);
             // offer smppevent
-            state = DialogState.forward;
+            state = DialogState.forward_0;
             gwProcessor.getSmppProcessor(processorId).offerSmppEvent(event);
             // awaiting by response
             state = DialogState.awaiting_0;
@@ -160,6 +162,7 @@ public class EsmeSubmitSmDialog extends Dialog {
     
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
+        super.handleSmppEvent(ev);
         try {
             PDU pdu = ev.getPDU();
             if (pdu.isResponse()) {
@@ -175,7 +178,7 @@ public class EsmeSubmitSmDialog extends Dialog {
                 else if (pdu.isOk() && Data.SUBMIT_SM_RESP == pdu.getCommandId()) {
                     if (registeredDelivery) {
                         // received response, go forward
-                        state = DialogState.forward;
+                        state = DialogState.forward_0;
                         // dispatch ForwardSmORetAsyncCall
                         commandStatusCode = Data.ESME_ROK;
                         // register smpp message id
@@ -217,7 +220,7 @@ public class EsmeSubmitSmDialog extends Dialog {
                 // handle Report delivery response
                 if (pdu.getCommandId() == Data.DELIVER_SM) {
                     // forward resp and confirmation delivery to mc
-                    state = DialogState.forward;
+                    state = DialogState.forward_0;
                     // only on register_delivery
                     gwProcessor.getSmppProcessor(processorId).offerSmppEvent(new DefaultResponseOKEvent((Request)pdu));
                     commandStatusCode = Data.ESME_ROK;
@@ -251,7 +254,7 @@ public class EsmeSubmitSmDialog extends Dialog {
         logger.info("Execute Dialog. dialogId:{} rds:{} state:{}", dialogId, registeredDelivery, state);
         try {
             if (!DialogState.close.equals(state)) {
-                if (DialogState.forward.equals(state)) {
+                if (DialogState.forward_0.equals(state)) {
                     // No in close estate means an error occurred in the work
                     // flow.
                     gwProcessor.getSmppProcessor(processorId).offerSmppEvent(new GenericNAckEvent(getCurrentSequenceNumber(), commandStatusCode == Data.ESME_ROK ? Data.ESME_RSYSERR : commandStatusCode));
@@ -264,7 +267,7 @@ public class EsmeSubmitSmDialog extends Dialog {
                     mcDispatcher.dispatch(fwsmoRetCall);
                 }
                 else if (DialogState.awaiting_1.equals(state)) {
-                    // delivery_sm confirmation never received
+                    // delivery_sm confirmation never received. No op
                 }
                 else {
                     // No op
@@ -272,7 +275,7 @@ public class EsmeSubmitSmDialog extends Dialog {
             }
             // No register delivery
             if (!registeredDelivery) return;
-            TpAddress recipientAddress = new TpAddress((byte) (toName.getType() & TpAddress.TON), (byte) (toName.getType() & TpAddress.NPI), toName.getName());
+            TpAddress recipientAddress = new TpAddress(getSmppTon(toName.getType()), getSmppNpi(toName.getType()), toName.getName());
             LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
             // SmsStatusReport
             // boolean tpUdhi, boolean tpMms, boolean tpSrq, byte tpMr, TpAddress tpRa, LocalDateTime tpScts, LocalDateTime tpDt, byte tpSt

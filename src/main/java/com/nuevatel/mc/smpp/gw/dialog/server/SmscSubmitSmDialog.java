@@ -10,6 +10,7 @@ import org.smpp.Data;
 import org.smpp.ServerPDUEvent;
 import org.smpp.pdu.Address;
 import org.smpp.pdu.PDU;
+import org.smpp.pdu.Request;
 import org.smpp.pdu.SubmitSM;
 import org.smpp.pdu.SubmitSMResp;
 
@@ -31,10 +32,12 @@ import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.domain.Config;
 import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.DeliverSmEvent;
+import com.nuevatel.mc.smpp.gw.event.GenericResponseEvent;
 import com.nuevatel.mc.smpp.gw.util.EsmClass;
+import com.nuevatel.mc.smpp.gw.util.NameTypeUtils;
 import com.nuevatel.mc.smpp.gw.util.TpDcsUtils;
 import com.nuevatel.mc.smpp.gw.util.TpStatusResolver;
-import com.nuevatel.mc.smpp.gw.util.TpUdUtils;
+import com.nuevatel.mc.smpp.gw.util.TpUdFactory;
 import com.nuevatel.mc.tpdu.SmsStatusReport;
 import com.nuevatel.mc.tpdu.SmsSubmit;
 import com.nuevatel.mc.tpdu.TpAddress;
@@ -92,12 +95,13 @@ public class SmscSubmitSmDialog extends Dialog {
     
     @Override
     public void handleSmppEvent(ServerPDUEvent ev) {
+        super.handleSmppEvent(ev);
         PDU pdu = ev.getPDU();
         commandStatusCode = pdu.getCommandStatus();
         try {
             if (pdu.isRequest() && pdu.getCommandId() == Data.SUBMIT_SM) {
                 // sumbitSm
-                state = DialogState.forward;
+                state = DialogState.forward_0;
                 // no ret
                 handleSubmitSm((SubmitSM) pdu);
             }
@@ -114,10 +118,22 @@ public class SmscSubmitSmDialog extends Dialog {
                 // invalidate
                 invalidate();
             }
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             state = DialogState.failed;
+            commandStatusCode = Data.ESME_RSYSERR;
             ret = AppMessages.FAILED;
-            logger.warn("Failed on handle SmppEvent...", ex);
+            logger.warn("Failed on handle SmppEvent. PDU:{}...", pdu == null ? null : pdu.debugString(), ex);
+            if (dialogId == -1) {
+                // no registered dialog
+                if (pdu instanceof Request) {
+                    GenericResponseEvent resp = new GenericResponseEvent(((Request)pdu).getResponse(), commandStatusCode);
+                    gwProcessor.getSmppProcessor(processorId).offerSmppEvent(resp);
+                }
+            }
+            else {
+                // failed - invalidate if dialog was registered.
+                invalidate();
+            }
         }
     }
     
@@ -150,10 +166,7 @@ public class SmscSubmitSmDialog extends Dialog {
         // SmsSubmit
         TpDcs tpDcs = TpDcsUtils.resolveTpDcs(submitSmPdu.getDataCoding()); // TpDcsUtils.resolveTpDcs("UTF-16BE");
         EsmClass esmClass = new EsmClass(submitSmPdu.getEsmClass());
-        TpUd tpud = new TpUd(esmClass.getUdhi(), // tpUdhi
-                             tpDcs, // tpDcs
-                             (byte) submitSmPdu.getShortMessageData().getBuffer().length, // tpUdl
-                             TpUdUtils.fixTpUd(tpDcs.getCharSet(), submitSmPdu.getShortMessageData().getBuffer())); // tpUd
+        TpUd tpud = TpUdFactory.getTpUd(tpDcs, esmClass, submitSmPdu.getShortMessageData().getBuffer());
         SmsSubmit smsSubmit = new SmsSubmit(// tpRd
                                             true,
                                             // tpRp
@@ -165,7 +178,9 @@ public class SmscSubmitSmDialog extends Dialog {
                                             // tpMr
                                             (byte)0x0,
                                             // tpDa
-                                            new TpAddress(submitSmPdu.getDestAddr().getTon(), submitSmPdu.getDestAddr().getNpi(), submitSmPdu.getDestAddr().getAddress()),
+                                            new TpAddress(NameTypeUtils.getNameTon(submitSmPdu.getDestAddr().getTon()),
+                                                          NameTypeUtils.getNameNpi(submitSmPdu.getDestAddr().getNpi()),
+                                                          submitSmPdu.getDestAddr().getAddress()),
                                             // tpPi
                                             submitSmPdu.getProtocolId(),
                                             // tpDcs
@@ -188,7 +203,7 @@ public class SmscSubmitSmDialog extends Dialog {
                                                       // smppSessionId
                                                       gwProcessor.getSmppGwSession().getSmppSessionId(),
                                                       // fromName
-                                                      new Name(submitSmPdu.getSourceAddr().getAddress(), (byte)(submitSmPdu.getSourceAddr().getTon() | submitSmPdu.getSourceAddr().getNpi())),
+                                                      new Name(submitSmPdu.getSourceAddr().getAddress(), NameTypeUtils.getNameType(submitSmPdu.getSourceAddr().getTon(), submitSmPdu.getSourceAddr().getNpi())),
                                                       // tpdu
                                                       smsSubmit.getTpdu());
         if (logger.isDebugEnabled() || logger.isTraceEnabled()) {
@@ -201,7 +216,6 @@ public class SmscSubmitSmDialog extends Dialog {
         Message ret = mcDispatcher.dispatchAndWait(fwsmiCall);
         if (ret == null) {
             // Failed
-            state = DialogState.failed;
             commandStatusCode = Data.ESME_RSYSERR;
             invalidate();
             return;
@@ -209,7 +223,6 @@ public class SmscSubmitSmDialog extends Dialog {
         ForwardSmIRet fwsmiRet = new ForwardSmIRet(ret);
         if (AppMessages.FAILED == fwsmiRet.getRet()) {
             // failed
-            state = DialogState.failed;
             commandStatusCode = Data.ESME_RSYSERR;
             invalidate();
             return;
@@ -224,7 +237,7 @@ public class SmscSubmitSmDialog extends Dialog {
         DefaultResponseOKEvent rok = new DefaultResponseOKEvent(submitSmPdu);
         smppMsgId = ((SubmitSMResp)rok.getResponse()).getMessageId();
         gwProcessor.getSmppProcessor(processorId).offerSmppEvent(rok);
-        state = DialogState.forward;
+        state = DialogState.forward_1;
         // If registered delivery is disable, close transaction
         if (!registeredDelivery) {
             state = DialogState.close;
@@ -272,12 +285,25 @@ public class SmscSubmitSmDialog extends Dialog {
     @Override
     public void execute() {
         logger.info("Execute Dialog. dialogId:{} rds:{} state:{}", dialogId, registeredDelivery, state);
-        if (registeredDelivery) {
-            // notify ForwardSmORetasync
-            ForwardSmORetAsyncCall fwsmoRet = new ForwardSmORetAsyncCall(fwsmoCallMsgId, ret, this.commandStatusCode);
-            logger.debug("ForwardSmORetAsyncCall messageId:{} ret:{} serviceMsg:{}", fwsmoRet.getMessageId(), fwsmoRet.getRet(), fwsmoRet.getServiceMsg());
-            mcDispatcher.dispatch(fwsmoRet);
-            logger.debug("Dispatch ForwardSmORetAsyncCall messageId:{} ret:{} commandStatusCode:{}", fwsmoCallMsgId, ret, commandStatusCode);;
+        try {
+            if (!DialogState.close.equals(state)) {
+                if (getPduEvent().getPDU().isRequest()) {
+                    if (DialogState.forward_0.equals(state)) {
+                        GenericResponseEvent resp = new GenericResponseEvent(((Request) getPduEvent().getPDU()).getResponse(), commandStatusCode);
+                        gwProcessor.getSmppProcessor(processorId).offerSmppEvent(resp);
+                    }
+                }
+            }
+            
+            if (registeredDelivery) {
+                // notify ForwardSmORetasync
+                ForwardSmORetAsyncCall fwsmoRet = new ForwardSmORetAsyncCall(fwsmoCallMsgId, ret, this.commandStatusCode);
+                logger.debug("ForwardSmORetAsyncCall messageId:{} ret:{} serviceMsg:{}", fwsmoRet.getMessageId(), fwsmoRet.getRet(), fwsmoRet.getServiceMsg());
+                mcDispatcher.dispatch(fwsmoRet);
+                logger.debug("Dispatch ForwardSmORetAsyncCall messageId:{} ret:{} commandStatusCode:{}", fwsmoCallMsgId, ret, commandStatusCode);
+            }
+        } catch (Throwable ex) {
+            logger.error("Failed on execute dialod. dialogId:{} processorId:{} gwSessionId:{}", dialogId, processorId, gwProcessor.getSmppGwSession().getSmppSessionId(), ex);
         }
     }
     

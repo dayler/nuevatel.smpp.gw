@@ -158,6 +158,28 @@
           <version>2.6</version>
           <executions>
             <execution>
+              <id>make-assembly-jar</id>
+              <phase>package</phase>
+              <goals>
+                <goal>single</goal>
+              </goals>
+              <configuration>
+                <descriptorRefs>
+                  <descriptorRef>jar-with-dependencies</descriptorRef>
+                </descriptorRefs>
+                <!-- <finalName>mc.smpp.gw-${project.version}-bundle</finalName> -->
+                <finalName>mc.smpp.gw</finalName>
+                <appendAssemblyId>false</appendAssemblyId>
+                <archive>
+                  <manifest>
+                    <addClasspath>true</addClasspath>
+                    <mainClass>SmppGw</mainClass>
+                  </manifest>
+                </archive>
+                <outputDirectory>${user.dir}/build</outputDirectory>
+              </configuration>
+            </execution>
+            <execution>
               <id>make-assembly-zip</id>
               <phase>package</phase>
               <goals>
@@ -175,7 +197,7 @@
                     <mainClass>SmppGw</mainClass>
                   </manifest>
                 </archive>
-                <outputDirectory>build/</outputDirectory>
+                <outputDirectory>${user.dir}/build</outputDirectory>
               </configuration>
             </execution>
           </executions>
@@ -413,16 +435,19 @@
         <groupId>com.nuevatel.common</groupId>
         <artifactId>appconn</artifactId>
         <version>2.0-MC</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>com.nuevatel.common</groupId>
         <artifactId>wsconn</artifactId>
         <version>2.0-MC</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>com.nuevatel.mc</groupId>
         <artifactId>mc.common</artifactId>
         <version>2.0-MC</version>
+        <scope>provided</scope>
       </dependency>
       <!-- buildNumber dependency -->
       <dependency>

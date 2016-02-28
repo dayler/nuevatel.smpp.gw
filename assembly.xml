@@ -33,6 +33,7 @@
             </includes>
         </fileSet>
         <fileSet>
+            <!-- 
             <directory>build/lib</directory>
             <outputDirectory>lib</outputDirectory>
             <excludes>
@@ -40,6 +41,9 @@
                 <exclude>mc.common-2.0-MC.jar</exclude>
                 <exclude>wsconn-2.0-MC.jar</exclude>
             </excludes>
+            -->
+            <directory>build</directory>
+            <outputDirectory>lib</outputDirectory>
             <includes>
                 <include>*.jar</include>
             </includes>

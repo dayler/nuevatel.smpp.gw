@@ -504,6 +504,9 @@ public class SmppServerProcessor extends SmppProcessor {
         if (event.isDeliveryAck()) {
             deliverSm.setReceiptedMessageId(event.getReceiptedMessageId());
         }
+        // TODO Message state
+        deliverSm.setMessageState(value);
+        
         // set command status
         deliverSm.setCommandStatus(event.getCommandStatus());
         // Assign sequence number

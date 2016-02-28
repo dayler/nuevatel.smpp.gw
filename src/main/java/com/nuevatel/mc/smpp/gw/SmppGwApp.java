@@ -14,6 +14,8 @@ import com.nuevatel.mc.smpp.gw.server.SmppServerGwProcessor;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -234,6 +236,10 @@ public class SmppGwApp extends GenericApp {
                 
                 for (Ie ie : ies) {
                     Integer proxyId = ((CompositeIe) ie).getInt(WS_IE.APP_ID.getName());
+                    // TODO
+                    System.out.println("=============================================");
+                    printProperties(callGetProperties(mgmtApp.getWsURL(), WS_METHOD.GET_APP_CLIENT_PROPERTIES, new IntIe(WS_IE.FROM_APP_ID.getName(), getAppId()), new IntIe(WS_IE.APP_ID.getName(), proxyId)));
+                    System.out.println("=============================================");
                     remoteBaseAppMap.put(proxyId, // Proxy Id
                                          new ProxyApp(proxyId, STATE.getState(((CompositeIe) ie).getString(WS_IE.STATE.getName())), // BaseApp
                                          new AppClient(getAppId(), proxyId, appClientTaskSet, callGetProperties(mgmtApp.getWsURL(), WS_METHOD.GET_APP_CLIENT_PROPERTIES, new IntIe(WS_IE.FROM_APP_ID.getName(), getAppId()), new IntIe(WS_IE.APP_ID.getName(), proxyId)))));
@@ -246,7 +252,17 @@ public class SmppGwApp extends GenericApp {
             throw new RuntimeException(e.getMessage(), e);
         }
     }
-
+    
+    private static void printProperties(Properties prop) {
+        if (prop == null) {
+            System.out.println("nul properties");
+            return;
+        }
+        for (Entry<Object, Object> entry : prop.entrySet()) {
+            System.out.println("[key=" + entry.getKey() + " value=" + entry.getValue() + "]");
+        }
+    }
+    
     /**
      * Gets <code>ServerGwProcessor</code> for SMPP_TYPE.ESME SmppClientProcessor in other case.
      * 

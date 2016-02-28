@@ -30,7 +30,6 @@ import com.nuevatel.mc.smpp.gw.dialog.Dialog;
 import com.nuevatel.mc.smpp.gw.dialog.DialogState;
 import com.nuevatel.mc.smpp.gw.dialog.DialogType;
 import com.nuevatel.mc.smpp.gw.domain.Config;
-import com.nuevatel.mc.smpp.gw.event.DefaultResponseOKEvent;
 import com.nuevatel.mc.smpp.gw.event.DeliverSmEvent;
 import com.nuevatel.mc.smpp.gw.event.GenericResponseEvent;
 import com.nuevatel.mc.smpp.gw.util.EsmClass;
@@ -233,8 +232,10 @@ public class SmscSubmitSmDialog extends Dialog {
         long tmpValidityPeriod = SmppDateUtil.parseDateTime(now, submitSmPdu.getValidityPeriod()).toEpochSecond() - now.toEpochSecond();
         dialogService.putDialog(this, tmpValidityPeriod > 0 ? tmpValidityPeriod : cfg.getDefaultValidityPeriod());
         logger.info("Created Dialog. dialogId:{} rds:{}", dialogId, registeredDelivery);
-        // if OK send sumbit_sm_resp
-        DefaultResponseOKEvent rok = new DefaultResponseOKEvent(submitSmPdu);
+        // if OK send sumbit_sm_resp with msg id
+        SubmitSMResp resp = (SubmitSMResp) submitSmPdu.getResponse();
+        resp.setMessageId(fwsmiRet.getMessageId() == null ? "" : fwsmiRet.getMessageId().toString());
+        GenericResponseEvent rok = new GenericResponseEvent(resp, Data.ESME_ROK);
         smppMsgId = ((SubmitSMResp)rok.getResponse()).getMessageId();
         gwProcessor.getSmppProcessor(processorId).offerSmppEvent(rok);
         state = DialogState.forward_1;
@@ -267,6 +268,9 @@ public class SmscSubmitSmDialog extends Dialog {
             deliverSmEv.setDestAddr(destAddr);
             deliverSmEv.setReceiptedMessageId(smppMsgId);
             // tpSt to smpp command status
+            // TODO
+            deliverSmEv.
+            
             int smppStatus = TpStatusResolver.resolveSmppCommandStatus(smsSr.getTpSt());
             deliverSmEv.setCommandStatus(smppStatus);
             // set delivery Ack

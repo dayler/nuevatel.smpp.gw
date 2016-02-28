@@ -83,7 +83,7 @@ public class SmppGwSession {
         this.systemType = systemType;
         this.rSourceAddrRegex = rSourceAddrRegex;
         this.maxBinds = maxBinds;
-        this.throttleLimit = throttleLimit;
+        this.throttleLimit = throttleLimit == null ? 0 : throttleLimit;
         this.bound = bound;
     }
 
